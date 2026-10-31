@@ -26,6 +26,7 @@ internal static class Program
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
         }
         var pasteOnly = args is ["--paste-limit"];
+        var renameRegression = args is ["--rename-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -64,6 +65,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (renameRegression)
+                {
+                    await WorkspaceRenameScenario.Regression(window, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Workspace rename reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (imeOnly)
                 {
                     await ImeScenario.Run(window, passed, args[0] switch { "--ime-only" => null, "--ime-arabic" => "--ime-keys", _ => args[0] }, args.ElementAtOrDefault(1));
