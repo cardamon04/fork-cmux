@@ -11,6 +11,13 @@ term.unicode.activeVersion = '11';
 term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
 const find = createTerminalSearch(term);
+let cwdLimit = 0;
+// xterm owns OSC framing across output chunks. The native side independently
+// validates the URI and local filesystem boundary before accepting metadata.
+term.parser.registerOscHandler(7, data => {
+  if (cwdLimit > 0 && data.length <= cwdLimit) send({kind:'cwd', data});
+  return true;
+});
 function resize() { const host=document.getElementById('terminal'); if (host.clientWidth > 30 && host.clientHeight > 30) fit.fit(); }
 term.onData(data => send({kind:'input', data}));
 term.onResize(size => send({kind:'resize', ...size}));
@@ -21,7 +28,7 @@ window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
   else if (m.kind === 'paste') { if (!find.paste(m.data)) term.paste(m.data); }
-  else if (m.kind === 'configure') find.configure(m.strings, m.locale);
+  else if (m.kind === 'configure') { cwdLimit = m.cwdLimit; find.configure(m.strings, m.locale); }
   else if (m.kind === 'find') find.open();
 });
 new ResizeObserver(resize).observe(document.getElementById('terminal'));

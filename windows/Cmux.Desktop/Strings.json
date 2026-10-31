@@ -47,7 +47,8 @@
     "FindEmpty": "Enter search text.",
     "FindMissing": "No matches.",
     "FindResults": "Search results",
-    "FindSearching": "Searching…"
+    "FindSearching": "Searching…",
+    "WorkingDirectory": "Directory: {0}"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -97,7 +98,8 @@
     "FindEmpty": "検索する文字列を入力してください。",
     "FindMissing": "一致する文字列はありません。",
     "FindResults": "検索結果",
-    "FindSearching": "検索中…"
+    "FindSearching": "検索中…",
+    "WorkingDirectory": "作業ディレクトリ: {0}"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -147,7 +149,8 @@
     "FindEmpty": "Suchtext eingeben.",
     "FindMissing": "Keine Treffer.",
     "FindResults": "Suchergebnisse",
-    "FindSearching": "Suche läuft…"
+    "FindSearching": "Suche läuft…",
+    "WorkingDirectory": "Verzeichnis: {0}"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -197,7 +200,8 @@
     "FindEmpty": "Saisissez le texte à rechercher.",
     "FindMissing": "Aucun résultat.",
     "FindResults": "Résultats de recherche",
-    "FindSearching": "Recherche en cours…"
+    "FindSearching": "Recherche en cours…",
+    "WorkingDirectory": "Dossier : {0}"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -247,7 +251,8 @@
     "FindEmpty": "أدخل نص البحث.",
     "FindMissing": "لا توجد تطابقات.",
     "FindResults": "نتائج البحث",
-    "FindSearching": "جارٍ البحث…"
+    "FindSearching": "جارٍ البحث…",
+    "WorkingDirectory": "المجلد: {0}"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -297,7 +302,8 @@
     "FindEmpty": "Escribe el texto que quieres buscar.",
     "FindMissing": "No hay coincidencias.",
     "FindResults": "Resultados de búsqueda",
-    "FindSearching": "Buscando…"
+    "FindSearching": "Buscando…",
+    "WorkingDirectory": "Directorio: {0}"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -347,7 +353,8 @@
     "FindEmpty": "請輸入搜尋文字。",
     "FindMissing": "找不到符合的項目。",
     "FindResults": "搜尋結果",
-    "FindSearching": "搜尋中…"
+    "FindSearching": "搜尋中…",
+    "WorkingDirectory": "工作目錄：{0}"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -397,7 +404,8 @@
     "FindEmpty": "请输入搜索文本。",
     "FindMissing": "没有匹配项。",
     "FindResults": "搜索结果",
-    "FindSearching": "正在搜索…"
+    "FindSearching": "正在搜索…",
+    "WorkingDirectory": "工作目录：{0}"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -447,6 +455,7 @@
     "FindEmpty": "검색할 텍스트를 입력하세요.",
     "FindMissing": "일치하는 항목이 없습니다.",
     "FindResults": "검색 결과",
-    "FindSearching": "검색 중…"
+    "FindSearching": "검색 중…",
+    "WorkingDirectory": "작업 디렉터리: {0}"
   }
 }

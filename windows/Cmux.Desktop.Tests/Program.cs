@@ -29,6 +29,8 @@ internal static class Program
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var cwdRegression = args is ["--cwd-regression"];
+        var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
+        var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -57,6 +59,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (cwdOnly || cwdShell)
+                {
+                    await WorkingDirectoryScenario.Run(shell, passed, cwdOnly && args.Length > 1 ? args[1] : null, cwdShell ? args.ElementAtOrDefault(1) ?? throw new ArgumentException("Select a CWD shell.") : null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Directory tracking reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (cwdRegression)
                 {
                     await WorkingDirectoryScenario.Regression(shell, passed);
@@ -265,6 +275,7 @@ internal static class Program
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
+                await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)

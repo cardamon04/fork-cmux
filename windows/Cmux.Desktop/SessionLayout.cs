@@ -12,7 +12,7 @@ internal static class SessionLayout
                     Ratio: workspace.SplitRatio(split), First: Visit(split.Panel1.Controls[0]), Second: Visit(split.Panel2.Controls[0]));
             var pane = (WorkspacePane)control;
             panes.Add(pane);
-            return pane is TerminalPane terminal ? new("terminal", Directory: terminal.LaunchDirectory)
+            return pane is TerminalPane terminal ? new("terminal", Directory: terminal.WorkingDirectory)
                 : new("browser", Url: ((BrowserPane)pane).SessionAddress);
         }
         var layout = Visit(workspace.Controls[0]);
