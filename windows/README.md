@@ -75,6 +75,8 @@ The focused `Cmux.Desktop.Tests.exe --packaging-and-locales` check verifies regi
 
 `--cwd-flood` saves while a private shell continuously reports an existing deep directory, checks the stored checkpoint and interrupts only that fixture. It also runs in the CWD/full suites. This is a live-load check; it is not evidence of a previously reproduced hang.
 
+`--cwd-case` verifies that a case-only accepted report updates both the pane model and displayed directory. It creates ordinary private directories without changing filesystem case-sensitivity flags. Actual case-sensitive filesystem behavior remains unverified. The restored-path regression also runs in a narrow window and checks logical output across soft wraps. Desktop teardown checks retain the original owned process handles from registration through close, without reopening exited PIDs.
+
 The UI catalog contains English, Japanese, German, French, Arabic, Spanish, Traditional/Simplified Chinese and Korean. The current Windows UI language selects a supported catalog, with English fallback. The terminal content follows the shell and font behavior.
 
 ## Boundaries and follow-up

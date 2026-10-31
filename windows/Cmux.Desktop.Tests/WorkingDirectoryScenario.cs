@@ -188,7 +188,7 @@ internal static class WorkingDirectoryScenario
             await restored.Started.WaitAsync(TimeSpan.FromSeconds(30));
             var reopened = (TerminalPane)restored.Current!.Active!;
             await Program.Command(reopened, "Write-Output ('REOPENED_CWD_'+(Get-Location).ProviderPath)");
-            try { await Program.Contains(reopened, "REOPENED_CWD_" + target); }
+            try { await ContainsPath(reopened, "REOPENED_CWD_" + target); }
             catch { Console.Error.WriteLine("cwd-regression rendered: " + await Program.Text(reopened)); throw; }
             Pass("cwd-report-save-close-and-reopen", passed);
         }

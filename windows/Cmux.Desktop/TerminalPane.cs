@@ -172,7 +172,7 @@ internal sealed class TerminalPane : WorkspacePane
     private void ApplyDirectory(string? path, long revision)
     {
         if (!stopped && revision == directoryRevision && path is not null
-            && !path.Equals(WorkingDirectory, StringComparison.OrdinalIgnoreCase))
+            && !path.Equals(WorkingDirectory, StringComparison.Ordinal))
         {
             WorkingDirectory = path;
             WorkingDirectoryChanged?.Invoke();
