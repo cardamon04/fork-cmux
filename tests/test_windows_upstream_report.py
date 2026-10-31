@@ -96,6 +96,13 @@ class UpstreamReportTests(unittest.TestCase):
         self.git("update-ref", "refs/remotes/upstream/main", target)
         self.assertEqual(self.report()["changes"][0]["path"], path.name)
 
+    def test_commit_subject_ignores_configured_log_encoding(self):
+        (self.repo / "README.md").write_text("new content\n")
+        target = self.commit("日本語の変更")
+        self.git("update-ref", "refs/remotes/upstream/main", target)
+        self.git("config", "i18n.logOutputEncoding", "shift_jis")
+        self.assertEqual(self.report()["commits"][0]["subject"], "日本語の変更")
+
     def test_rename_includes_old_and_new_path_for_impact_review(self):
         self.git("mv", "README.md", "Browser.md")
         target = self.commit("rename")

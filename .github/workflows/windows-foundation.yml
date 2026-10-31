@@ -60,3 +60,11 @@ jobs:
           $pwshPath = (Get-Command pwsh).Source
           dotnet run --project Prototypes/WindowsTerminal -- --self-test $pwshPath
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate focused-test evidence
+        shell: pwsh
+        run: |
+          $result = & Prototypes/WindowsTerminal/bin/Debug/net10.0/WindowsTerminal.exe --self-test 'C:\unavailable-pwsh.exe' resize-reaches-client | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($result.powershell -ne 'not-run' -or $result.outcomes.Count -ne 1 -or $result.outcomes[0].test -ne 'resize-reaches-client') {
+            throw 'Focused test output misreports which tests ran.'
+          }
