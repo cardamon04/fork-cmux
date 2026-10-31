@@ -22,6 +22,9 @@ internal static class Program
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
         var pasteOnly = args is ["--paste-limit"];
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
+        var browserFailures = args is ["--browser-failures"];
+        var uiErrors = new List<Exception>();
+        Application.ThreadException += (_, e) => uiErrors.Add(e.Exception);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         var directory = Directory.CreateTempSubdirectory("cmux-desktop-test-").FullName;
@@ -44,6 +47,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (browserFailures)
+                {
+                    await BrowserFailureScenario.Run(window, passed, uiErrors);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    Require(!Directory.Exists(profile) && window.BrowserProfilePath is { } ownBrowser && !Directory.Exists(ownBrowser), "Failure fixture profiles were not removed.");
+                    exitCode = 0;
+                    return;
+                }
                 if (browserOnly)
                 {
                     await window.ClickAction("NewWorkspace");
@@ -195,8 +206,10 @@ internal static class Program
 
                 Require(PackagingAndLocales() == 0, "Application localization or distribution notices failed.");
                 Pass("localized-ui-actions", passed);
+                await BrowserFailureScenario.Run(window, passed, uiErrors);
                 await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
+                Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)
                 {
                     Directory.CreateDirectory(args[0]);
