@@ -1,0 +1,73 @@
+name: Windows foundation
+
+on:
+  pull_request:
+    paths:
+      - 'Prototypes/WindowsTerminal/**'
+      - 'scripts/windows/**'
+      - 'tests/test_windows_upstream_report.py'
+      - 'docs/windows-upstream-baseline.json'
+      - '.github/workflows/windows-foundation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upstream-report:
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'ubuntu-24.04' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'blacksmith-4vcpu-ubuntu-2404' || vars.LINUX_RUNNER || 'blacksmith-4vcpu-ubuntu-2404' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python tests/test_windows_upstream_report.py -v
+
+  conpty:
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'windows-2025' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'blacksmith-4vcpu-windows-2025' || vars.WINDOWS_RUNNER || 'blacksmith-4vcpu-windows-2025' }}
+    timeout-minutes: 5
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify read-only upstream reporting on Windows
+        run: python tests/test_windows_upstream_report.py -v
+      - name: Build and exercise ConPTY and PowerShell
+        shell: pwsh
+        run: |
+          $pwshPath = (Get-Command pwsh).Source
+          dotnet run --project Prototypes/WindowsTerminal -- --self-test $pwshPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate focused-test evidence
+        shell: pwsh
+        run: |
+          $result = & Prototypes/WindowsTerminal/bin/Debug/net10.0/WindowsTerminal.exe --self-test 'C:\unavailable-pwsh.exe' resize-reaches-client | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($result.powershell -ne 'not-run' -or $result.outcomes.Count -ne 1 -or $result.outcomes[0].test -ne 'resize-reaches-client') {
+            throw 'Focused test output misreports which tests ran.'
+          }
+      - name: Reject input echo as PowerShell output
+        shell: pwsh
+        run: |
+          dotnet build Prototypes/WindowsTerminal/Fixtures/FakeShell --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $fakeShell = (Resolve-Path Prototypes/WindowsTerminal/Fixtures/FakeShell/bin/Debug/net10.0/FakeShell.exe).Path
+          $result = & Prototypes/WindowsTerminal/bin/Debug/net10.0/WindowsTerminal.exe --self-test $fakeShell powershell-utf8-and-exit | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 1 -or $result.outcomes.Count -ne 1 -or $result.outcomes[0].status -ne 'failed' -or $result.outcomes[0].error -notmatch 'Expected @@POWERSHELL:') {
+            throw 'A client that only echoes input must not pass the PowerShell output test.'
+          }
+          exit 0
