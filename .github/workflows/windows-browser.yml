@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   webview2:
-    runs-on: windows-latest
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'windows-2025' || 'blacksmith-4vcpu-windows-2025' }}
     timeout-minutes: 8
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
