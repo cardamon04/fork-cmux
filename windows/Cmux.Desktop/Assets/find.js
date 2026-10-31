@@ -55,7 +55,9 @@ function createTerminalSearch(term) {
   function ownsFocus() { return !bar.hidden && bar.contains(document.activeElement); }
   close.addEventListener('click', dismiss);
   bar.addEventListener('keydown', event => {
-    if (event.isComposing || composing) return;
+    // IME-owned boundary keys can arrive before start or after end, with
+    // isComposing false. Leave their default handling to the input method.
+    if (event.isComposing || composing || event.keyCode === 229) return;
     if (event.key === 'Escape') { event.preventDefault(); dismiss(); }
     else if (event.key === 'Enter' && event.target === query) { event.preventDefault(); run(event.shiftKey); }
   });
