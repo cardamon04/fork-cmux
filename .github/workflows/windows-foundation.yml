@@ -8,14 +8,6 @@ on:
       - 'tests/test_windows_upstream_report.py'
       - 'docs/windows-upstream-baseline.json'
       - '.github/workflows/windows-foundation.yml'
-  push:
-    branches: ['codex/windows-conpty-foundation']
-    paths:
-      - 'Prototypes/WindowsTerminal/**'
-      - 'scripts/windows/**'
-      - 'tests/test_windows_upstream_report.py'
-      - 'docs/windows-upstream-baseline.json'
-      - '.github/workflows/windows-foundation.yml'
   workflow_dispatch:
 
 permissions:
@@ -68,3 +60,14 @@ jobs:
           if ($result.powershell -ne 'not-run' -or $result.outcomes.Count -ne 1 -or $result.outcomes[0].test -ne 'resize-reaches-client') {
             throw 'Focused test output misreports which tests ran.'
           }
+      - name: Reject input echo as PowerShell output
+        shell: pwsh
+        run: |
+          dotnet build Prototypes/WindowsTerminal/Fixtures/FakeShell --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $fakeShell = (Resolve-Path Prototypes/WindowsTerminal/Fixtures/FakeShell/bin/Debug/net10.0/FakeShell.exe).Path
+          $result = & Prototypes/WindowsTerminal/bin/Debug/net10.0/WindowsTerminal.exe --self-test $fakeShell powershell-utf8-and-exit | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 1 -or $result.outcomes.Count -ne 1 -or $result.outcomes[0].status -ne 'failed' -or $result.outcomes[0].error -notmatch 'Expected @@POWERSHELL:') {
+            throw 'A client that only echoes input must not pass the PowerShell output test.'
+          }
+          exit 0
