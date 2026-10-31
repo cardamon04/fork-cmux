@@ -52,6 +52,7 @@ function createTerminalSearch(term) {
   function dismiss() {
     clear(); bar.hidden = true; term.focus();
   }
+  function ownsFocus() { return !bar.hidden && bar.contains(document.activeElement); }
   close.addEventListener('click', dismiss);
   bar.addEventListener('keydown', event => {
     if (event.isComposing || composing) return;
@@ -60,6 +61,17 @@ function createTerminalSearch(term) {
   });
   window.addEventListener('pagehide', clear);
   return Object.freeze({
+    // Native toolbar focus temporarily leaves the WebView. Its DOM focus still
+    // identifies the input owner; pasted search text must never become shell input.
+    paste: text => {
+      if (!ownsFocus()) return false;
+      const start = query.selectionStart, end = query.selectionEnd;
+      const available = Math.max(0, query.maxLength - (query.value.length - (end - start)));
+      query.setRangeText(text.replace(/[\r\n]/g, '').slice(0, available), start, end, 'end');
+      query.focus(); changed();
+      return true;
+    },
+    selection: () => ownsFocus() ? query.value.slice(query.selectionStart, query.selectionEnd) : '',
     configure: (localized, locale) => {
       strings = localized;
       document.documentElement.lang = locale || 'en';

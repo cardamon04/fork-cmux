@@ -187,7 +187,7 @@ internal sealed class TerminalPane : WorkspacePane
     internal override async Task Copy()
     {
         if (!IsPage(Core.Source)) return;
-        var selection = JsonSerializer.Deserialize<string>(await Core.ExecuteScriptAsync("window.cmux.selection()"));
+        var selection = JsonSerializer.Deserialize<string>(await Core.ExecuteScriptAsync("window.cmux.copySelection()"));
         if (!string.IsNullOrEmpty(selection)) clipboard.Write(selection);
     }
     internal override void Paste()

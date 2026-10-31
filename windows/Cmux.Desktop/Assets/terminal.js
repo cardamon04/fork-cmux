@@ -20,7 +20,7 @@ document.getElementById('find-bar').addEventListener('pointerdown', event => { i
 window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
-  else if (m.kind === 'paste') term.paste(m.data);
+  else if (m.kind === 'paste') { if (!find.paste(m.data)) term.paste(m.data); }
   else if (m.kind === 'configure') find.configure(m.strings, m.locale);
   else if (m.kind === 'find') find.open();
 });
@@ -30,6 +30,7 @@ send({kind:'ready', cols:term.cols, rows:term.rows});
 // Read-only renderer inspection also supports application-level integration tests.
 window.cmux = Object.freeze({
   selection: () => term.getSelection(),
+  copySelection: () => find.selection() || term.getSelection(),
   text: () => Array.from({length:term.buffer.active.length}, (_,i) => term.buffer.active.getLine(i).translateToString(true)).join('\n'),
   size: () => ({cols:term.cols, rows:term.rows}),
   focus: () => term.focus(),
