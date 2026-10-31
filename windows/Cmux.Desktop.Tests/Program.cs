@@ -20,6 +20,7 @@ internal static class Program
             return 0;
         }
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
+        var pasteOnly = args is ["--paste-limit"];
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         var directory = Directory.CreateTempSubdirectory("cmux-desktop-test-").FullName;
@@ -42,6 +43,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (pasteOnly)
+                {
+                    await PasteLimit(window, clipboard, pids);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    Require(!Directory.Exists(profile), "Application profile was not removed.");
+                    exitCode = 0;
+                    return;
+                }
                 await Command(first, "Write-Output ('日本語😀' + '_ready')");
                 await Contains(first, "日本語😀_ready");
                 Pass("interactive-powershell-unicode", passed);
@@ -169,6 +178,9 @@ internal static class Program
                 }
                 Pass("pending-native-input-cancels-before-close", passed);
 
+                await PasteLimit(window, clipboard, pids);
+                Pass("bracketed-paste-content-limit", passed);
+
                 Require(PackagingAndLocales() == 0, "Application localization or distribution notices failed.");
                 Pass("localized-ui-actions", passed);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
@@ -205,6 +217,32 @@ internal static class Program
         return exitCode;
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static async Task PasteLimit(DesktopWindow window, MemoryClipboard clipboard, List<int> pids)
+    {
+        await window.ClickAction("NewWorkspace");
+        var pane = window.Current!.Active!;
+        pids.Add(pane.ProcessId);
+        await Until(async () => (await Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "Paste shell was not ready.");
+        await pane.Core.ExecuteScriptAsync("window.pasteLength=0;term.onData(data=>window.pasteLength=data.length);term.write('\\x1b[?2004h');");
+        await Until(async () => await pane.Core.ExecuteScriptAsync("term.modes.bracketedPasteMode") == "true", "Bracketed paste was not enabled.");
+        const string marker = "PASTE_BUDGET_MARK";
+        clipboard.Text = new string(' ', 32768 - marker.Length) + marker;
+        var failure = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        pane.Failed += message => failure.TrySetResult(message);
+        await window.ClickAction("Paste");
+        using var forwardingCancellation = new CancellationTokenSource();
+        var forwarded = Until(async () => (await Text(pane)).Contains(marker), "Clipboard input did not reach the shell.", forwardingCancellation.Token);
+        if (await Task.WhenAny(forwarded, failure.Task) == failure.Task)
+        {
+            forwardingCancellation.Cancel();
+            try { await forwarded; } catch (OperationCanceledException) { }
+            throw new InvalidOperationException("Allowed clipboard content was rejected: " + await failure.Task);
+        }
+        await forwarded;
+        Require(await pane.Core.ExecuteScriptAsync("window.pasteLength") == "32780", "The test did not exercise bracketed-paste framing.");
+        Require(window.LastError is null, "Paste reported a product error.");
+        await window.ClickAction("CloseWorkspace");
+    }
     private static int PackagingAndLocales()
     {
         var failures = new List<string>();
@@ -278,10 +316,10 @@ internal static class Program
         return (json.RootElement.GetProperty("cols").GetInt32(), json.RootElement.GetProperty("rows").GetInt32());
     }
     private static Task Contains(TerminalPane pane, string marker) => Until(async () => (await Text(pane)).Contains(marker), "Missing rendered output: " + marker);
-    private static async Task Until(Func<Task<bool>> check, string failure)
+    private static async Task Until(Func<Task<bool>> check, string failure, CancellationToken cancellationToken = default)
     {
         var watch = Stopwatch.StartNew();
-        while (watch.Elapsed < Deadline) { if (await check()) return; await Task.Delay(50); }
+        while (watch.Elapsed < Deadline) { cancellationToken.ThrowIfCancellationRequested(); if (await check()) return; await Task.Delay(50, cancellationToken); }
         throw new TimeoutException(failure);
     }
     private static async Task Command(TerminalPane pane, string text)
