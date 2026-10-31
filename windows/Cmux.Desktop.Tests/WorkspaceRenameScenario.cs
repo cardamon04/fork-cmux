@@ -85,6 +85,14 @@ internal static class WorkspaceRenameScenario
             var browserPane = other.Active;
             Require(first.IsActionEnabled("RenameWorkspace") && browserPane is BrowserPane, "Browser workspaces cannot be renamed.");
             first.SelectWorkspace(0);
+            await Edit(first, () => { _ = first.ClickAction("RenameWorkspace"); }, dialog =>
+            {
+                first.SelectWorkspace(1);
+                Button(dialog, "Cancel").PerformClick();
+            });
+            Console.WriteLine("RENAME_CANCEL_SELECTION " + JsonSerializer.Serialize(new { Selected = first.Current == other, Browser = other.Active == browserPane, Focus = browserPane!.ContainsFocus }));
+            await Program.Until(() => Task.FromResult(first.Current == other && other.Active == browserPane && browserPane!.ContainsFocus), "Cancel did not return logical focus to the newly selected browser pane.");
+            first.SelectWorkspace(0);
             const string selectedElsewhere = "  pinned 日本語😀 ; $() & <literal>  ";
             await Edit(first, () => { _ = first.ClickAction("RenameWorkspace"); }, dialog =>
             {
