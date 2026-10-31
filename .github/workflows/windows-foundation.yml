@@ -1,0 +1,62 @@
+name: Windows foundation
+
+on:
+  pull_request:
+    paths:
+      - 'Prototypes/WindowsTerminal/**'
+      - 'scripts/windows/**'
+      - 'tests/test_windows_upstream_report.py'
+      - 'docs/windows-upstream-baseline.json'
+      - '.github/workflows/windows-foundation.yml'
+  push:
+    branches: ['codex/windows-conpty-foundation']
+    paths:
+      - 'Prototypes/WindowsTerminal/**'
+      - 'scripts/windows/**'
+      - 'tests/test_windows_upstream_report.py'
+      - 'docs/windows-upstream-baseline.json'
+      - '.github/workflows/windows-foundation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upstream-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python tests/test_windows_upstream_report.py -v
+
+  conpty:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify read-only upstream reporting on Windows
+        run: python tests/test_windows_upstream_report.py -v
+      - name: Build and exercise ConPTY and PowerShell
+        shell: pwsh
+        run: |
+          $pwshPath = (Get-Command pwsh).Source
+          dotnet run --project Prototypes/WindowsTerminal -- --self-test $pwshPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,8 +1,10 @@
 # cmux Windows版の要求と引き継ぎ
 
-自分の普段の開発で使えるcmuxのWindows版を目指します。本家の全機能対応、クラウド・iPhone連携、最新機能への追随、個人用winget定義による導入、アプリ内自動更新が対象です。要求・要件は確定済みで、Windows版の実装・動作検証は未着手です。
+自分の普段の開発で使えるcmuxのWindows版を目指します。本家の全機能対応、クラウド・iPhone連携、最新機能への追随、個人用winget定義による導入、アプリ内自動更新が対象です。要求・要件は確定済みです。ConPTYの技術検証と本家差分追跡の実装に着手しましたが、Windows製品の実装・受入検証は未完了です。
 
 要求・要件と進行状況の正本は[requirements.md](requirements.md)、全15問の回答記録は[interview-log.md](interview-log.md)です。
+
+実装の入口、検証結果、継続追従の手順は[windows-development.md](windows-development.md)、機能対照表の初期一覧は[windows-feature-inventory.md](windows-feature-inventory.md)です。進捗・仕様確認・判断依頼は[Draft PR #1](https://github.com/cardamon04/fork-cmux/pull/1)へ集約します。
 
 ## リポジトリ
 

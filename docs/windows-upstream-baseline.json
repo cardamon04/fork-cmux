@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/manaflow-ai/cmux.git",
+  "branch": "main",
+  "commit": "2e4c17c63767048f6a790b071f87e7eca68ff8ae",
+  "recorded_at": "2026-10-31",
+  "purpose": "Initial Windows investigation baseline; feature parity has not been established."
+}
