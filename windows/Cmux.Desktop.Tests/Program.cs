@@ -32,6 +32,7 @@ internal static class Program
         var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
         var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
         var cwdFlood = args is ["--cwd-flood"];
+        var cwdCase = args is ["--cwd-case"];
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -60,6 +61,13 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (cwdCase)
+                {
+                    await WorkingDirectoryScenario.ReportedCase(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (cwdFlood)
                 {
                     await WorkingDirectoryScenario.Flood(shell, passed);

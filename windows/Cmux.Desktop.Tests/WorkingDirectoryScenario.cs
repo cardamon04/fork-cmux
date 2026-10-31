@@ -7,7 +7,7 @@ internal static class WorkingDirectoryScenario
     internal static async Task Run(ShellLaunch launch, List<string> passed, string? artifacts = null, string? only = null)
     {
         if (only is not (null or "pwsh" or "windows-powershell")) throw new ArgumentException("Unknown CWD shell case.");
-        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); await Flood(launch, passed); }
+        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); await Flood(launch, passed); await ReportedCase(launch, passed); }
         if (only is null or "pwsh") await Integration(launch, "pwsh", passed, artifacts);
         if (only is null or "windows-powershell")
         {
@@ -164,7 +164,7 @@ internal static class WorkingDirectoryScenario
         var target = Directory.CreateDirectory(Path.Combine(directory, "日本語 # % ' ; $(synthetic)")).FullName;
         var path = Path.Combine(directory, "session.json");
         using var first = new DesktopWindow(launch with { Directory = directory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
-        using var restored = new DesktopWindow(launch with { Directory = directory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
+        using var restored = new DesktopWindow(launch with { Directory = directory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false, ClientSize = new Size(640, 400) };
         try
         {
             first.Show();
@@ -188,7 +188,8 @@ internal static class WorkingDirectoryScenario
             await restored.Started.WaitAsync(TimeSpan.FromSeconds(30));
             var reopened = (TerminalPane)restored.Current!.Active!;
             await Program.Command(reopened, "Write-Output ('REOPENED_CWD_'+(Get-Location).ProviderPath)");
-            await Program.Contains(reopened, "REOPENED_CWD_" + target);
+            try { await Program.Contains(reopened, "REOPENED_CWD_" + target); }
+            catch { Console.Error.WriteLine("cwd-regression rendered: " + await Program.Text(reopened)); throw; }
             Pass("cwd-report-save-close-and-reopen", passed);
         }
         finally
@@ -198,6 +199,31 @@ internal static class WorkingDirectoryScenario
             Directory.Delete(directory, recursive: true);
         }
     }
+    internal static async Task ReportedCase(ShellLaunch launch, List<string> passed)
+    {
+        var directory = Directory.CreateTempSubdirectory("cmux-cwd-case-").FullName;
+        var lower = Directory.CreateDirectory(Path.Combine(directory, "casePair")).FullName;
+        var upper = Directory.CreateDirectory(Path.Combine(directory, "CASEPAIR")).FullName;
+        using var window = new DesktopWindow(launch with { Directory = directory }, new MemoryClipboard()) { ShowInTaskbar = false };
+        try
+        {
+            window.Show(); await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            var pane = (TerminalPane)window.Current!.Active!;
+            var sequence = 0;
+            foreach (var target in new[] { lower, upper })
+            {
+                var marker = "CASE_REPORT_" + ++sequence + "_READY";
+                await Program.Command(pane, "[Console]::Write(([char]27)+']7;'+'" + new Uri(target).AbsoluteUri.Replace("'", "''") + "'+([char]7)); Write-Output ('CASE_REPORT_'+'" + sequence + "_READY')");
+                await Program.Contains(pane, marker);
+                await Program.Until(async () => await pane.CaptureWorkingDirectory() == target, "A valid directory spelling was not captured.");
+                Require(pane.WorkingDirectory == target, "A case-only CWD report did not update the model.");
+                Require(Status(window).Contains(target, StringComparison.Ordinal), "The status display lost the reported directory spelling.");
+            }
+            Pass("cwd-preserves-reported-path-case", passed);
+        }
+        finally { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); window.Close(); Directory.Delete(directory, recursive: true); }
+    }
+
     internal static async Task Flood(ShellLaunch launch, List<string> passed)
     {
         var directory = Directory.CreateTempSubdirectory("cmux-cwd-flood-").FullName;
