@@ -29,6 +29,7 @@ internal static class Program
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
+        var sessionRegressions = args.Length > 0 && args[0] == "--session-regressions";
         var uiErrors = new List<Exception>();
         Application.ThreadException += (_, e) => uiErrors.Add(e.Exception);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
@@ -53,10 +54,20 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (sessionRegressions)
+                {
+                    await Until(async () => (await Text(first)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The regression fixture shell did not finish startup.");
+                    await SessionRegressionScenario.Run(shell, passed, args.Length > 1 ? args[1] : null);
+                    Require(uiErrors.Count == 0, "A regression reached native UI dispatch with an exception.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (sessionOnly)
                 {
                     SessionStoreScenario.Run(passed);
                     await SessionScenario.Run(shell, passed, args.Length > 1 ? args[1] : null);
+                    await SessionRegressionScenario.Run(shell, passed);
                     Require(uiErrors.Count == 0, "Session operations reached native UI dispatch with an exception.");
                     await window.Shutdown().WaitAsync(Deadline);
                     exitCode = 0;
@@ -225,6 +236,7 @@ internal static class Program
                 await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
+                await SessionRegressionScenario.Run(shell, passed);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)
