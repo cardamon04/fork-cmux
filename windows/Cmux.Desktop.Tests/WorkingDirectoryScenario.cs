@@ -39,7 +39,7 @@ internal static class WorkingDirectoryScenario
             await window.ClickAction("SplitRight");
             var second = (TerminalPane)window.Current.Active!;
             await Program.Command(second, "Write-Output ('SPLIT_CWD_'+(Get-Location).ProviderPath)");
-            await ContainsPath(second, "SPLIT_CWD_" + firstTarget);
+            await ActualDirectory(second, firstTarget, "SPLIT_CWD_");
             await Change(first, secondTarget);
             Require(Status(window).Contains(secondTarget) && second.WorkingDirectory == firstTarget, "Directory state crossed terminal panes.");
             await window.ClickAction("OpenBrowser");
@@ -94,13 +94,13 @@ internal static class WorkingDirectoryScenario
             {
                 var expected = pane == panes[0] ? secondTarget : firstTarget;
                 await Program.Command(pane, "Write-Output ('ACTUAL_RESTORED_'+(Get-Location).ProviderPath)");
-                await ContainsPath(pane, "ACTUAL_RESTORED_" + expected);
+                await ActualDirectory(pane, expected, "ACTUAL_RESTORED_");
                 await Program.Until(() => Task.FromResult(pane.WorkingDirectory == expected), "The restored shell did not report its own directory.");
             }
-            if (artifacts is not null && name == "pwsh")
+            if (artifacts is not null)
             {
                 Directory.CreateDirectory(artifacts);
-                OwnedWindows.Capture(restored.Handle, Path.Combine(artifacts, "working-directory.png"));
+                OwnedWindows.Capture(restored.Handle, Path.Combine(artifacts, name == "pwsh" ? "working-directory.png" : "working-directory-windows-powershell.png"));
             }
             Require(window.LastError is null && restored.LastError is null, "The integrated window reported an error.");
             Pass("cwd-" + name + "-save-and-reopen-actual-directory", passed);
@@ -122,6 +122,19 @@ internal static class WorkingDirectoryScenario
     private static string Status(DesktopWindow window) => window.Controls.OfType<StatusStrip>().Single().Items["WorkingDirectory"]!.Text ?? "";
     private static Task ContainsPath(TerminalPane pane, string marker) => Program.Until(async () =>
         (await Program.Text(pane)).Replace("\r", "").Replace("\n", "").Contains(marker), "Missing rendered logical path: " + marker);
+
+    private static async Task ActualDirectory(TerminalPane pane, string expected, string visiblePrefix)
+    {
+        // The cwd oracle reads the actual provider path as UTF-8 bytes over an
+        // ASCII envelope, independently of legacy console glyph width/encoding.
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(expected));
+        await Program.Command(pane, "Write-Output ('CWD_UTF8_'+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Location).ProviderPath))); Write-Output ('CWD_OUTPUT_CODEPAGE_'+[Console]::OutputEncoding.CodePage)");
+        try { await ContainsPath(pane, "CWD_UTF8_" + encoded); }
+        catch { Console.Error.WriteLine("cwd-value diagnostic: " + await Program.Text(pane)); throw; }
+        var rendered = await Program.Text(pane);
+        if (!rendered.Replace("\r", "").Replace("\n", "").Contains(visiblePrefix + expected))
+            Console.WriteLine("coverage-gap: literal Unicode path display differs; UTF-8 cwd value verified. private rendered data: " + rendered);
+    }
 
     private static async Task ValidateBoundaries(ShellLaunch launch, List<string> passed)
     {

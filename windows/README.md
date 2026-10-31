@@ -77,6 +77,8 @@ The focused `Cmux.Desktop.Tests.exe --packaging-and-locales` check verifies regi
 
 `--cwd-case` verifies that a case-only accepted report updates both the pane model and displayed directory. It creates ordinary private directories without changing filesystem case-sensitivity flags. Actual case-sensitive filesystem behavior remains unverified. The restored-path regression also runs in a narrow window and checks logical output across soft wraps. Desktop teardown checks retain the original owned process handles from registration through close, without reopening exited PIDs.
 
+Integration checks compare the shell's actual provider path as UTF-8 bytes in an ASCII envelope, independently of legacy console text rendering. They still print the readable path; any mismatch is logged as a display coverage gap with the private rendered output and console codepage. A correct cwd value does not establish Unicode glyph/width parity. Both PowerShell versions capture their own restored fixture window (`working-directory.png` and `working-directory-windows-powershell.png`).
+
 The UI catalog contains English, Japanese, German, French, Arabic, Spanish, Traditional/Simplified Chinese and Korean. The current Windows UI language selects a supported catalog, with English fallback. The terminal content follows the shell and font behavior.
 
 ## Boundaries and follow-up
