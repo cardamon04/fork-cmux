@@ -120,6 +120,9 @@ internal sealed class DesktopWindow : Form
         editingWorkspaceTitle = true;
         try { result = dialog.ShowDialog(this); }
         finally { editingWorkspaceTitle = false; }
+        // The selected workspace may have changed while the modal loop ran.
+        // Restore its logical pane on every exit, including Cancel.
+        if (!shuttingDown && !closingWindow) SelectWorkspace();
         if (result != DialogResult.OK || shuttingDown || closingWindow
             || !Workspaces.Contains(workspace)) return Task.CompletedTask;
         if (!workspace.TryRename(dialog.WorkspaceName)) throw new InvalidOperationException(strings.Format("WorkspaceNameInvalid", WorkspaceTitle.MaxCharacters));
