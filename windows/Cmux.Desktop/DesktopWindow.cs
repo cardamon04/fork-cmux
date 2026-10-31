@@ -19,6 +19,7 @@ internal sealed class DesktopWindow : Form
     private bool shuttingDown;
     private bool shutdownComplete;
     private bool selectingWorkspace;
+    private bool editingWorkspaceTitle;
     private bool closingWindow;
     private int workspaceSequence;
     internal Task Started => started.Task;
@@ -115,14 +116,28 @@ internal sealed class DesktopWindow : Form
     {
         if (Current is not { } workspace) return Task.CompletedTask;
         using var dialog = new WorkspaceRenameDialog(strings, workspace.Title);
-        if (dialog.ShowDialog(this) != DialogResult.OK || shuttingDown || closingWindow
+        DialogResult result;
+        editingWorkspaceTitle = true;
+        try { result = dialog.ShowDialog(this); }
+        finally { editingWorkspaceTitle = false; }
+        if (result != DialogResult.OK || shuttingDown || closingWindow
             || !Workspaces.Contains(workspace)) return Task.CompletedTask;
         if (!workspace.TryRename(dialog.WorkspaceName)) throw new InvalidOperationException(strings.Format("WorkspaceNameInvalid", WorkspaceTitle.MaxCharacters));
-        var selected = sidebar.SelectedItem;
-        sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace;
-        sidebar.SelectedItem = selected;
+        var selected = Current;
+        var active = selected?.Active;
+        var wasSelecting = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            // Updating a native list item can emit temporary selection/focus
+            // events. It must only refresh the label, not select a pane.
+            sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace;
+            sidebar.SelectedItem = selected;
+        }
+        finally { selectingWorkspace = wasSelecting; }
+        if (selected is not null && selected == Current && active is not null) ActivatePane(selected, active);
         UpdateActions();
-        if (Current == workspace) workspace.Active?.FocusPane();
+        if (selected == Current) active?.FocusPane();
         return Task.CompletedTask;
     }
 
@@ -272,7 +287,9 @@ internal sealed class DesktopWindow : Form
             ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, paneLaunch ?? launch);
         pane.Activated += active =>
         {
-            if (!selectingWorkspace && Current == workspace) ActivatePane(workspace, active);
+            // A modal editor can restore a native child focus that does not
+            // represent a new user pane selection.
+            if (!selectingWorkspace && !editingWorkspaceTitle && Current == workspace) ActivatePane(workspace, active);
         };
         pane.Failed += ShowError;
         if (pane is TerminalPane terminal)
