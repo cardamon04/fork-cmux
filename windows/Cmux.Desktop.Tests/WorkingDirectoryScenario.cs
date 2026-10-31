@@ -7,7 +7,7 @@ internal static class WorkingDirectoryScenario
     internal static async Task Run(ShellLaunch launch, List<string> passed, string? artifacts = null, string? only = null)
     {
         if (only is not (null or "pwsh" or "windows-powershell")) throw new ArgumentException("Unknown CWD shell case.");
-        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); await Flood(launch, passed); await ReportedCase(launch, passed); }
+        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); await Flood(launch, passed); await ReportedCase(launch, passed); await OracleBoundary(launch, passed); }
         if (only is null or "pwsh") await Integration(launch, "pwsh", passed, artifacts);
         if (only is null or "windows-powershell")
         {
@@ -212,6 +212,35 @@ internal static class WorkingDirectoryScenario
             Directory.Delete(directory, recursive: true);
         }
     }
+    internal static async Task OracleBoundary(ShellLaunch source, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-cwd-oracle-").FullName;
+        var parent = Path.Combine(root, "parent");
+        while (System.Text.Encoding.UTF8.GetByteCount(parent) % 3 != 0) parent += "x";
+        var child = Directory.CreateDirectory(Path.Combine(parent, "child")).FullName;
+        var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+        try
+        {
+            foreach (var item in new[] { (Name: "pwsh", Launch: source), (Name: "windows-powershell", Launch: source with { Executable = fallback }) })
+            {
+                using var window = new DesktopWindow(item.Launch with { Directory = child }, new MemoryClipboard()) { ShowInTaskbar = false };
+                try
+                {
+                    window.Show(); await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+                    var pane = (TerminalPane)window.Current!.Active!;
+                    await ActualDirectory(pane, child, "UNUSED_");
+                    var rejected = false;
+                    try { await ActualDirectory(pane, parent, "UNUSED_"); }
+                    catch (InvalidOperationException error) when (error.Message == "Actual shell working directory did not match the expected value.") { rejected = true; }
+                    Require(rejected, "The cwd value oracle accepted a descendant of the expected directory.");
+                    Pass("cwd-" + item.Name + "-oracle-rejects-descendant-prefix", passed);
+                }
+                finally { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); window.Close(); }
+            }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     internal static async Task ReportedCase(ShellLaunch launch, List<string> passed)
     {
         var directory = Directory.CreateTempSubdirectory("cmux-cwd-case-").FullName;

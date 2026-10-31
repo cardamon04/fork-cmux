@@ -33,6 +33,7 @@ internal static class Program
         var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
         var cwdFlood = args is ["--cwd-flood"];
         var cwdCase = args is ["--cwd-case"];
+        var cwdOracle = args is ["--cwd-oracle"];
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -61,6 +62,13 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (cwdOracle)
+                {
+                    await WorkingDirectoryScenario.OracleBoundary(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (cwdCase)
                 {
                     await WorkingDirectoryScenario.ReportedCase(shell, passed);
