@@ -27,6 +27,7 @@ internal static class Program
         }
         var pasteOnly = args is ["--paste-limit"];
         var renameRegression = args is ["--rename-regression"];
+        var renameOnly = args.Length > 0 && args[0] == "--rename-only";
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -65,6 +66,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (renameOnly)
+                {
+                    await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(1));
+                    Require(uiErrors.Count == 0, "Workspace rename reached native UI dispatch with an exception.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (renameRegression)
                 {
                     await WorkspaceRenameScenario.Regression(window, passed);
@@ -321,6 +330,7 @@ internal static class Program
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
+                await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)
