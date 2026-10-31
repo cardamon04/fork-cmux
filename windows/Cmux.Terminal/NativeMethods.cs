@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
-namespace WindowsTerminal;
+namespace Cmux.Terminal;
 
 internal static class NativeMethods
 {

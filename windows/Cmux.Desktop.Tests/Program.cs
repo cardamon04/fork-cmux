@@ -1,0 +1,221 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using Cmux.Desktop;
+using Cmux.Terminal;
+
+internal static class Program
+{
+    private static int exitCode = 1;
+    private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        Console.OutputEncoding = Encoding.UTF8;
+        if (args is ["--blocked-input"])
+        {
+            Console.WriteLine("BLOCKED_READY");
+            Thread.Sleep(TimeSpan.FromMinutes(2)); // Child fixture deliberately never consumes its input.
+            return 0;
+        }
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+        var directory = Directory.CreateTempSubdirectory("cmux-desktop-test-").FullName;
+        var history = Path.Combine(directory, "history.txt").Replace("'", "''");
+        var shell = ShellLaunch.Default() with
+        {
+            Arguments = ["-NoLogo", "-NoProfile", "-NoExit", "-Command", $"Set-PSReadLineOption -HistorySaveStyle SaveNothing -HistorySavePath '{history}'; function global:prompt {{ 'CMUX_TEST_READY> ' }}"],
+            Directory = directory,
+        };
+        var clipboard = new MemoryClipboard();
+        using var window = new DesktopWindow(shell, clipboard) { ShowInTaskbar = false };
+        window.Shown += async (_, _) =>
+        {
+            var pids = new List<int>();
+            var profile = "";
+            var passed = new List<string>();
+            try
+            {
+                await window.Started.WaitAsync(Deadline);
+                profile = window.ProfilePath;
+                var first = window.Current!.Active!;
+                pids.Add(first.ProcessId);
+                await Command(first, "Write-Output ('日本語😀' + '_ready')");
+                await Contains(first, "日本語😀_ready");
+                Pass("interactive-powershell-unicode", passed);
+
+                await Command(first, "[Console]::Write(([char]27)+'[31m'+('RED_'+'MARK')+([char]27)+'[0m')");
+                await Contains(first, "RED_MARK");
+                var color = await first.Core.ExecuteScriptAsync("window.cmux.foreground('RED_MARK')");
+                Require(color == "1", "SGR color was not rendered as red: " + color);
+                Pass("vt-color-rendering", passed);
+
+                var oldSize = await Size(first);
+                await window.ClickAction("SplitRight");
+                Require(window.Current.Panes.Count == 2, "Split button did not create a second terminal.");
+                var second = window.Current.Active!;
+                pids.Add(second.ProcessId);
+                await Until(async () => (await Size(first)).Cols < oldSize.Cols, "Original terminal did not resize after split.");
+                var size = await Size(first);
+                await Command(first, "Write-Output ('SIZE_' + [Console]::WindowWidth + ':' + [Console]::WindowHeight)");
+                await Contains(first, $"SIZE_{size.Cols}:{size.Rows}");
+                await Command(second, "Write-Output ('SECOND_' + 'PANE')");
+                await Contains(second, "SECOND_PANE");
+                Require(!(await Text(second)).Contains("日本語😀_ready"), "Terminal outputs were mixed.");
+                await second.Core.ExecuteScriptAsync("window.cmux.focus()");
+                await Until(() => Task.FromResult(window.Current.Active == second), "Focus did not select the second pane.");
+                using var secondProcess = Process.GetProcessById(second.ProcessId);
+                await window.ClickAction("ClosePane");
+                await secondProcess.WaitForExitAsync().WaitAsync(Deadline);
+                Require(window.Current.Panes.Count == 1, "Closing a split did not collapse it.");
+                await Contains(first, "日本語😀_ready");
+                Pass("split-resize-isolation-close", passed);
+
+                await window.ClickAction("SplitBelow");
+                var below = window.Current.Active!;
+                pids.Add(below.ProcessId);
+                Require(window.Current.Controls[0] is SplitContainer { Orientation: Orientation.Horizontal }, "Split below used the wrong layout.");
+                await Command(below, "Write-Output ('BELOW_' + 'PANE')");
+                await Contains(below, "BELOW_PANE");
+                await window.ClickAction("ClosePane");
+                Pass("split-below", passed);
+
+                await window.ClickAction("NewWorkspace");
+                var other = window.Current!.Active!;
+                pids.Add(other.ProcessId);
+                clipboard.Text = "Write-Output ('PASTE_' + 'WORKSPACE')\r";
+                await window.ClickAction("Paste");
+                await Contains(other, "PASTE_WORKSPACE");
+                window.SelectWorkspace(0);
+                await Contains(first, "日本語😀_ready");
+                Require(!(await Text(first)).Contains("PASTE_WORKSPACE"), "Workspace outputs were mixed.");
+                window.SelectWorkspace(1);
+                await Contains(other, "PASTE_WORKSPACE");
+                await window.ClickAction("CloseWorkspace");
+                Require(window.Workspaces.Count() == 1, "Workspace close failed.");
+                Pass("workspace-switch-and-paste-action", passed);
+
+                var navigation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                first.Core.NavigationCompleted += (_, _) => navigation.TrySetResult();
+                first.Core.Navigate("https://example.invalid/");
+                await navigation.Task.WaitAsync(Deadline);
+                Require(first.Core.Source == TerminalPane.Page, "Terminal escaped its fixed local origin.");
+                await Command(first, "Write-Output ('<script>' + 'window.pwned=1</script>')");
+                await Contains(first, "<script>window.pwned=1</script>");
+                Require(await first.Core.ExecuteScriptAsync("typeof window.pwned") == "\"undefined\"", "Terminal output executed JavaScript.");
+                Pass("navigation-and-output-boundary", passed);
+
+                await window.ClickAction("NewWorkspace");
+                var noisy = window.Current!.Active!;
+                pids.Add(noisy.ProcessId);
+                await Command(noisy, "while ($true) { [Console]::Write('LOAD_') }");
+                await Contains(noisy, "LOAD_LOAD_");
+                await window.ClickAction("CloseWorkspace").WaitAsync(Deadline);
+                await Command(first, "Write-Output ('AFTER_' + 'CLOSE')");
+                await Contains(first, "AFTER_CLOSE");
+                Pass("close-during-output-preserves-other-terminal", passed);
+
+                for (var index = 1; index < 10; index++)
+                {
+                    await window.ClickAction("NewWorkspace");
+                    var pane = window.Current!.Active!;
+                    pids.Add(pane.ProcessId);
+                    await Command(pane, $"Write-Output ('LIVE_' + '{index}')");
+                    await Contains(pane, $"LIVE_{index}");
+                }
+                Require(window.Workspaces.Count() == 10, "Ten live terminals were not retained.");
+                foreach (var workspace in window.Workspaces)
+                    foreach (var pane in workspace.Panes)
+                    {
+                        using var process = Process.GetProcessById(pane.ProcessId);
+                        Require(!process.HasExited, "A workspace shell exited while switching.");
+                    }
+                window.SelectWorkspace(0);
+                await Contains(first, "AFTER_CLOSE");
+                Pass("ten-live-desktop-terminals", passed);
+
+                var blockedReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var blockedOutput = new StringBuilder();
+                using (var blocked = ConPtySession.Start(Environment.ProcessPath!, ["--blocked-input"], directory, 80, 24, text =>
+                {
+                    blockedOutput.Append(text);
+                    if (blockedOutput.ToString().Contains("BLOCKED_READY")) blockedReady.TrySetResult();
+                }))
+                {
+                    await blockedReady.Task.WaitAsync(Deadline);
+                    pids.Add(blocked.ProcessId);
+                    using var cancelInput = new CancellationTokenSource();
+                    var write = blocked.WriteAsync(new string('x', 4_000_000), cancelInput.Token);
+                    Require(!write.IsCompleted, "The no-reader fixture did not produce a pending pipe write.");
+                    cancelInput.Cancel();
+                    try { await write.WaitAsync(Deadline); throw new InvalidOperationException("Pending input ignored cancellation."); }
+                    catch (OperationCanceledException) when (cancelInput.IsCancellationRequested) { }
+                }
+                Pass("pending-native-input-cancels-before-close", passed);
+
+                foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
+                {
+                    var strings = new Strings(CultureInfo.GetCultureInfo(locale));
+                    Require(!string.IsNullOrWhiteSpace(strings["SplitRight"]), "Missing localized action.");
+                    Require(strings.Format("Workspace", 7).Contains('7'), "Workspace placeholder missing.");
+                }
+                Pass("localized-ui-actions", passed);
+                Require(window.LastError is null, "The product reported an error: " + window.LastError);
+                if (args.Length > 0)
+                {
+                    Directory.CreateDirectory(args[0]);
+                    using var image = File.Create(Path.Combine(args[0], "terminal.png"));
+                    await first.Core.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, image);
+                }
+                await window.Shutdown().WaitAsync(Deadline);
+                Require(!Directory.Exists(profile), "Application profile was not removed.");
+                foreach (var pid in pids)
+                    try { using var process = Process.GetProcessById(pid); Require(process.HasExited, "Owned shell is still running."); }
+                    catch (ArgumentException) { }
+                Pass("owned-process-and-profile-teardown", passed);
+                Console.WriteLine(JsonSerializer.Serialize(new { os = Environment.OSVersion.VersionString, runtime = Environment.Version.ToString(), tests = passed }));
+                exitCode = 0;
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine(error);
+                Console.Error.WriteLine("product-error: " + window.LastError);
+                if (window.Current?.Active is { } failedPane)
+                    try { Console.Error.WriteLine("rendered: " + (await Text(failedPane))); } catch (Exception capture) { Console.Error.WriteLine(capture.Message); }
+            }
+            finally
+            {
+                try { await window.Shutdown().WaitAsync(Deadline); } catch (Exception error) { Console.Error.WriteLine("cleanup: " + error); }
+                window.Close();
+                try { Directory.Delete(directory, recursive: true); } catch (Exception error) { Console.Error.WriteLine(error); exitCode = 1; }
+            }
+        };
+        Application.Run(window);
+        return exitCode;
+    }
+    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static void Pass(string name, List<string> passed) { passed.Add(name); Console.WriteLine("passed: " + name); }
+    private static async Task<string> Text(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.text()"))!;
+    private static async Task<(int Cols, int Rows)> Size(TerminalPane pane)
+    {
+        using var json = JsonDocument.Parse(await pane.Core.ExecuteScriptAsync("window.cmux.size()"));
+        return (json.RootElement.GetProperty("cols").GetInt32(), json.RootElement.GetProperty("rows").GetInt32());
+    }
+    private static Task Contains(TerminalPane pane, string marker) => Until(async () => (await Text(pane)).Contains(marker), "Missing rendered output: " + marker);
+    private static async Task Until(Func<Task<bool>> check, string failure)
+    {
+        var watch = Stopwatch.StartNew();
+        while (watch.Elapsed < Deadline) { if (await check()) return; await Task.Delay(50); }
+        throw new TimeoutException(failure);
+    }
+    private static async Task Command(TerminalPane pane, string text)
+    {
+        await Until(async () => (await Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "PowerShell did not finish startup or return to its prompt.");
+        pane.FocusTerminal();
+        await pane.Core.ExecuteScriptAsync("window.cmux.focus()");
+        await pane.Core.CallDevToolsProtocolMethodAsync("Input.insertText", JsonSerializer.Serialize(new { text }));
+        foreach (var type in new[] { "keyDown", "keyUp" })
+            await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key = "Enter", code = "Enter", windowsVirtualKeyCode = 13, nativeVirtualKeyCode = 13, text = type == "keyDown" ? "\r" : "" }));
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "cmux-windows-desktop-assets",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-unicode11": "0.9.0"
+  }
+}

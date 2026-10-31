@@ -1,0 +1,179 @@
+using System.Text;
+using System.Text.Json;
+using System.Threading.Channels;
+using Microsoft.Web.WebView2.Core;
+
+namespace Cmux.Desktop;
+
+internal sealed class TerminalPane : UserControl, IAsyncDisposable
+{
+    internal const string Page = "https://cmux-terminal.invalid/index.html";
+    private readonly Channel<string> output = Channel.CreateBounded<string>(32);
+    private readonly TaskCompletionSource<(short Cols, short Rows)> ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource closing = new();
+    private readonly Strings strings;
+    private readonly IClipboard clipboard;
+    private CoreWebView2Controller? controller;
+    private TerminalConnection? connection;
+    private Task? pump;
+    private TaskCompletionSource? ack;
+    private long sequence;
+    private bool stopped;
+    internal event Action<TerminalPane>? Activated;
+    internal event Action<string>? Failed;
+    internal CoreWebView2 Core => controller!.CoreWebView2;
+    internal int ProcessId => connection!.ProcessId;
+
+    internal TerminalPane(Strings strings, IClipboard clipboard)
+    {
+        this.strings = strings;
+        this.clipboard = clipboard;
+        Dock = DockStyle.Fill;
+        Padding = new Padding(2);
+        BackColor = Color.FromArgb(24, 26, 31);
+        Resize += (_, _) => UpdateControllerBounds();
+        PaddingChanged += (_, _) => UpdateControllerBounds();
+        VisibleChanged += (_, _) => { if (controller is not null) controller.IsVisible = Visible; };
+    }
+
+    private void UpdateControllerBounds()
+    {
+        if (controller is not null)
+            controller.Bounds = new Rectangle(Padding.Left, Padding.Top,
+                Math.Max(1, ClientSize.Width - Padding.Horizontal), Math.Max(1, ClientSize.Height - Padding.Vertical));
+    }
+
+    internal async Task Start(TerminalEnvironment environment, ShellLaunch launch)
+    {
+        controller = await environment.CreateController(Handle);
+        UpdateControllerBounds();
+        controller.IsVisible = Visible;
+        controller.GotFocus += (_, _) => Activated?.Invoke(this);
+        Core.Settings.AreHostObjectsAllowed = false;
+        Core.Settings.AreDefaultContextMenusEnabled = false;
+        Core.Settings.AreDefaultScriptDialogsEnabled = false;
+        Core.Settings.AreDevToolsEnabled = false;
+        Core.Settings.IsStatusBarEnabled = false;
+        Core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;
+        Core.NewWindowRequested += (_, e) => e.Handled = true;
+        Core.DownloadStarting += (_, e) => e.Cancel = true;
+        Core.NavigationStarting += (_, e) => { if (!IsPage(e.Uri)) e.Cancel = true; };
+        Core.FrameNavigationStarting += (_, e) => e.Cancel = true;
+        Core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+        Core.WebResourceRequested += (_, e) => Serve(environment.Core, e);
+        Core.WebMessageReceived += Message;
+        Core.Navigate(Page);
+        var size = await ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        pump = PumpOutput();
+        connection = new(launch, size.Cols, size.Rows, text =>
+        {
+            try { output.Writer.WriteAsync(text, closing.Token).AsTask().GetAwaiter().GetResult(); }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+            catch (ChannelClosedException) when (closing.IsCancellationRequested) { }
+        });
+        await connection.Started;
+    }
+
+    private static bool IsPage(string uri) => string.Equals(uri, Page, StringComparison.OrdinalIgnoreCase);
+    private void Serve(CoreWebView2Environment environment, CoreWebView2WebResourceRequestedEventArgs args)
+    {
+        var uri = new Uri(args.Request.Uri);
+        var files = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["/index.html"] = "text/html", ["/terminal.js"] = "text/javascript",
+            ["/terminal.css"] = "text/css", ["/xterm.js"] = "text/javascript", ["/xterm.css"] = "text/css",
+            ["/addon-fit.js"] = "text/javascript", ["/addon-unicode11.js"] = "text/javascript",
+        };
+        if (uri.GetLeftPart(UriPartial.Authority) != "https://cmux-terminal.invalid" || !files.TryGetValue(uri.AbsolutePath, out var mime))
+        {
+            args.Response = environment.CreateWebResourceResponse(new MemoryStream(), 403, "Forbidden", "");
+            return;
+        }
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Assets", uri.AbsolutePath[1..]));
+        var headers = $"Content-Type: {mime}; charset=utf-8\r\nContent-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store";
+        args.Response = environment.CreateWebResourceResponse(new MemoryStream(bytes, writable: false), 200, "OK", headers);
+    }
+
+    private async void Message(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        if (stopped || !IsPage(e.Source) || !IsPage(Core.Source)) return;
+        try
+        {
+            using var json = JsonDocument.Parse(e.WebMessageAsJson);
+            var root = json.RootElement;
+            switch (root.GetProperty("kind").GetString())
+            {
+                case "ready": ready.TrySetResult(SizeFrom(root)); break;
+                case "ack": if (root.GetProperty("id").GetInt64() == sequence) ack?.TrySetResult(); break;
+                case "input" when connection is not null:
+                    var text = root.GetProperty("data").GetString()!;
+                    if (text.Length > 32768) throw new InvalidOperationException(strings["PasteTooLarge"]);
+                    await connection.Write(text);
+                    break;
+                case "resize" when connection is not null:
+                    var size = SizeFrom(root);
+                    await connection.Resize(size.Cols, size.Rows);
+                    break;
+                case "focus": Activated?.Invoke(this); break;
+            }
+        }
+        catch (Exception error) { if (!stopped) Failed?.Invoke(error.Message); }
+    }
+
+    private static (short Cols, short Rows) SizeFrom(JsonElement root)
+    {
+        var cols = root.GetProperty("cols").GetInt32();
+        var rows = root.GetProperty("rows").GetInt32();
+        if (cols < 1 || rows < 1 || cols > 1000 || rows > 1000) throw new InvalidOperationException("Invalid terminal size.");
+        return ((short)cols, (short)rows);
+    }
+
+    private async Task PumpOutput()
+    {
+        try
+        {
+            while (await output.Reader.WaitToReadAsync(closing.Token))
+            {
+                var batch = new StringBuilder();
+                while (batch.Length < 32768 && output.Reader.TryRead(out var part)) batch.Append(part);
+                ack = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "output", data = batch.ToString(), id = ++sequence }));
+                await ack.Task.WaitAsync(TimeSpan.FromSeconds(20), closing.Token);
+            }
+        }
+        catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            Failed?.Invoke(error.Message);
+            closing.Cancel(); // Unblock the native output drain even if the renderer failed.
+        }
+    }
+
+    internal void FocusTerminal() => controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+    internal async Task Copy()
+    {
+        if (!IsPage(Core.Source)) return;
+        var selection = JsonSerializer.Deserialize<string>(await Core.ExecuteScriptAsync("window.cmux.selection()"));
+        if (!string.IsNullOrEmpty(selection)) clipboard.Write(selection);
+    }
+    internal void Paste()
+    {
+        if (!IsPage(Core.Source)) return;
+        var text = clipboard.Read();
+        if (text.Length > 32768) throw new InvalidOperationException(strings["PasteTooLarge"]);
+        Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "paste", data = text }));
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (stopped) return;
+        stopped = true;
+        closing.Cancel();
+        output.Writer.TryComplete();
+        try
+        {
+            if (connection is not null) await connection.DisposeAsync();
+            if (pump is not null) await pump;
+        }
+        finally { controller?.Close(); controller = null; closing.Dispose(); }
+    }
+}

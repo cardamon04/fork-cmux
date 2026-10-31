@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Cmux.Terminal;
 using WindowsTerminal;
 
 Console.OutputEncoding = new UTF8Encoding(false);

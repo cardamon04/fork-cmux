@@ -24,6 +24,7 @@
 
 ## 実装と検証の入口
 
+- [操作できるWindowsデスクトップの起動・検証](../windows/README.md)。ワークスペース・縦横分割・対話PowerShellを実装しています。全機能・受入条件の合格ではありません。
 - [ConPTYプロトタイプの実行方法](../Prototypes/WindowsTerminal/README.md)
 - [既存候補の比較とブラウザ設計](windows-architecture-comparison.md)、[WebView2検証の実行方法](../Prototypes/WindowsBrowser/README.md)。この検証でもGUI方式の採用は確定しません。
 - [機能対照表の初期一覧](windows-feature-inventory.md)。28項目へ分解しましたが、網羅性の確認はまだ必要です。

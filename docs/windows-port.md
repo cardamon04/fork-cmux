@@ -4,7 +4,7 @@
 
 要求・要件と進行状況の正本は[requirements.md](requirements.md)、全15問の回答記録は[interview-log.md](interview-log.md)です。
 
-実装の入口、検証結果、継続追従の手順は[windows-development.md](windows-development.md)、機能対照表の初期一覧は[windows-feature-inventory.md](windows-feature-inventory.md)です。進捗・仕様確認・判断依頼は[Draft PR #1](https://github.com/cardamon04/fork-cmux/pull/1)へ集約します。
+実装の入口、検証結果、継続追従の手順は[windows-development.md](windows-development.md)、機能対照表の初期一覧は[windows-feature-inventory.md](windows-feature-inventory.md)です。実際に操作するWindowsアプリの起動方法は[windows/README.md](../windows/README.md)に記録します。進捗・仕様確認・判断依頼は[Draft PR #1](https://github.com/cardamon04/fork-cmux/pull/1)と後続のDraft PRへ記録します。製品全体の受入条件は未達です。
 
 ## リポジトリ
 

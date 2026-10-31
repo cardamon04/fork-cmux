@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <ProjectReference Include="../Cmux.Terminal/Cmux.Terminal.csproj" />
+    <InternalsVisibleTo Include="Cmux.Desktop.Tests" />
+    <EmbeddedResource Include="Strings.json" />
+    <Content Include="Assets/**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/xterm/lib/xterm.js" Link="Assets/xterm.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/xterm/css/xterm.css" Link="Assets/xterm.css" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/xterm/LICENSE" Link="Assets/xterm.LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-fit/lib/addon-fit.js" Link="Assets/addon-fit.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-fit/LICENSE" Link="Assets/addon-fit.LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js" Link="Assets/addon-unicode11.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-unicode11/LICENSE" Link="Assets/addon-unicode11.LICENSE" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="UseOnlyWebViewCore" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" />
+    </ItemGroup>
+  </Target>
+  <Target Name="RequireTerminalAssets" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('node_modules/@xterm/xterm/lib/xterm.js')" Text="Run npm ci --ignore-scripts in windows/Cmux.Desktop before building." />
+  </Target>
+</Project>
