@@ -79,6 +79,10 @@ internal static class NativeMethods
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool TerminateProcess(SafeProcessHandle process, uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetExitCodeProcess(SafeProcessHandle process, out uint exitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
