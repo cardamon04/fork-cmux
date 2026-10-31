@@ -1,0 +1,40 @@
+name: Windows browser engine
+
+on:
+  pull_request:
+    paths:
+      - 'Prototypes/WindowsBrowser/**'
+      - '.github/workflows/windows-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webview2:
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'windows-2025' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'blacksmith-4vcpu-windows-2025' || vars.WINDOWS_RUNNER || 'blacksmith-4vcpu-windows-2025' }}
+    timeout-minutes: 8
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore fixed SDK package
+        run: dotnet restore Prototypes/WindowsBrowser --locked-mode
+      - name: Build hidden browser host
+        run: dotnet build Prototypes/WindowsBrowser --no-restore --nologo -warnaserror
+      - name: Verify real browser operations and profile isolation
+        shell: pwsh
+        run: |
+          & Prototypes/WindowsBrowser/bin/Debug/net10.0-windows/WindowsBrowser.exe --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
