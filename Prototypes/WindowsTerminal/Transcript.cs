@@ -21,6 +21,11 @@ internal sealed class Transcript
         }
     }
 
+    internal bool Contains(string value)
+    {
+        lock (gate) return text.ToString().Contains(value, StringComparison.Ordinal);
+    }
+
     internal async Task WaitFor(string expected)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));

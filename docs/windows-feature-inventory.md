@@ -24,7 +24,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-016 | F-09 | Codexの対話、フック、通知、状態、再開、分割連携 | [agent-hooks](agent-hooks.md)、[agent-recovery](agent-recovery.md)、[CMUXAgentLaunch](../Packages/macOS/CMUXAgentLaunch/) | 実エージェントを用いた検証は未実行 |
 | WIN-017 | F-09 | Claude Codeの対話、フック、通知、状態、再開、チーム連携 | [agent-hooks](agent-hooks.md)、[CMUXAgentLaunch](../Packages/macOS/CMUXAgentLaunch/) | 実エージェントを用いた検証は未実行 |
 | WIN-018 | F-09 | その他の本家エージェント・チャット連携 | [CmuxAgentChat](../Packages/Shared/CmuxAgentChat/)、[agent-messages](agent-messages.md) | 提供元と対応機能を列挙する必要あり |
-| WIN-019 | F-10 | レイアウト・CWD・履歴・ブラウザ状態の保存と復元 | [SessionPersistence](../Sources/SessionPersistence.swift)、[agent-recovery](agent-recovery.md) | 保存対象・条件を比較して設計する必要あり |
+| WIN-019 | F-10 | レイアウト・CWD・履歴・ブラウザ状態の保存と復元 | [SessionPersistence](../Sources/SessionPersistence.swift)、[agent-recovery](agent-recovery.md) | 部分実装。[Windowsアプリ](../windows/README.md)で終了時保存・次回起動時復元、混在分割・比率・選択・起動ディレクトリ・ブラウザURLに対応。シェル内cd、履歴・スクロールバック、ブラウザ履歴・ログイン状態、クラッシュ復旧等は未対応。F-10全体の合格ではない |
 | WIN-020 | F-10 | 実行中プロセスの維持、再接続、エージェント再開 | [CmuxAgentSessionStore](../Packages/macOS/CmuxAgentSessionStore/)、[agent-recovery](agent-recovery.md) | 未実装 |
 | WIN-021 | F-11 | Ghostty設定、フォント、テーマ、色、設定再読み込み | [configuration](configuration.md)、[CmuxSettings](../Packages/macOS/CmuxSettings/) | 設定キーごとの互換表が必要 |
 | WIN-022 | F-11 | Windows向けキー割り当て、変更、カスタムコマンド、補完 | [ghostty-keybindings](ghostty-keybindings.md)、[configuration](configuration.md) | Ctrl+Cなどの通常操作とIMEを含めて検証する必要あり |

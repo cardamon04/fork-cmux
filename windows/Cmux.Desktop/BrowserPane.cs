@@ -19,6 +19,7 @@ internal sealed class BrowserPane : WorkspacePane
     internal override CoreWebView2 Core => controller?.CoreWebView2 ?? throw new ObjectDisposedException(nameof(BrowserPane));
     internal override PaneKind Kind => PaneKind.Browser;
     internal string AddressText => address.Text;
+    internal string SessionAddress { get; private set; } = "about:blank";
     internal string StatusText => message.Text ?? "";
 
     internal BrowserPane(Strings strings)
@@ -111,7 +112,11 @@ internal sealed class BrowserPane : WorkspacePane
         Core.NewWindowRequested += (_, e) => { e.Handled = true; if (!Unavailable) message.Text = strings["PopupBlocked"]; };
         Core.DownloadStarting += (_, e) => { e.Cancel = true; if (!Unavailable) message.Text = strings["DownloadBlocked"]; };
         Core.PermissionRequested += (_, e) => { e.State = CoreWebView2PermissionState.Deny; if (!Unavailable) message.Text = strings["PermissionBlocked"]; };
-        Core.SourceChanged += (_, _) => UseNative(() => address.Text = Core.Source);
+        Core.SourceChanged += (_, _) => UseNative(() =>
+        {
+            address.Text = Core.Source;
+            SessionAddress = SessionSnapshot.IsBrowserAddress(Core.Source) ? Core.Source : "about:blank";
+        });
         Core.HistoryChanged += (_, _) => UpdateHistory();
         Core.NavigationCompleted += (_, e) =>
         {
@@ -211,6 +216,13 @@ internal sealed class BrowserPane : WorkspacePane
         || Uri.TryCreate(text, UriKind.Absolute, out var uri) && (IsHttp(uri) || uri.Scheme is "data" or "blob");
 
     internal void NavigateFromAddress(string text) { address.Text = text; ClickNavigation("Go"); }
+    internal void RestoreAddress(string text)
+    {
+        // Retain the saved target while a new document has yet to commit.
+        // A later SourceChanged replaces it with the actual navigated address.
+        SessionAddress = text;
+        NavigateFromAddress(text);
+    }
     internal void ClickNavigation(string key) => ((ToolStripButton)navigation.Items[key]!).PerformClick();
     internal bool IsNavigationEnabled(string key) => navigation.Enabled && navigation.Items[key]!.Enabled;
     internal override void FocusPane()

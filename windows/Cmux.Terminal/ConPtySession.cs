@@ -211,6 +211,20 @@ public sealed class ConPtySession : IDisposable
             {
                 var result = NativeMethods.WaitForSingleObject(process, 10000);
                 if (result == NativeMethods.WaitTimeout)
+                {
+                    // Closing the pseudoconsole can miss a client still starting
+                    // up. Finish cancellation through our original process handle;
+                    // never reopen a PID that could have been reused.
+                    if (!NativeMethods.TerminateProcess(process, 0xC000013A))
+                    {
+                        var error = Marshal.GetLastWin32Error();
+                        // The client may have exited between the wait and cancel.
+                        if (NativeMethods.WaitForSingleObject(process, 0) != NativeMethods.WaitObject0)
+                            throw new Win32Exception(error);
+                    }
+                    result = NativeMethods.WaitForSingleObject(process, 10000);
+                }
+                if (result == NativeMethods.WaitTimeout)
                     throw new TimeoutException("The ConPTY client did not exit during shutdown.");
                 if (result != NativeMethods.WaitObject0)
                     throw new Win32Exception(Marshal.GetLastWin32Error());
