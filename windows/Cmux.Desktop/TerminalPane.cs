@@ -5,7 +5,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace Cmux.Desktop;
 
-internal sealed class TerminalPane : UserControl, IAsyncDisposable
+internal sealed class TerminalPane : WorkspacePane
 {
     internal const string Page = "https://cmux-terminal.invalid/index.html";
     private const int MaxInputCharacters = 32768;
@@ -16,21 +16,23 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
     private readonly CancellationTokenSource closing = new();
     private readonly Strings strings;
     private readonly IClipboard clipboard;
+    private readonly ShellLaunch launch;
     private CoreWebView2Controller? controller;
     private TerminalConnection? connection;
     private Task? pump;
     private TaskCompletionSource? ack;
     private long sequence;
     private bool stopped;
-    internal event Action<TerminalPane>? Activated;
-    internal event Action<string>? Failed;
-    internal CoreWebView2 Core => controller!.CoreWebView2;
+    internal override CoreWebView2 Core => controller!.CoreWebView2;
+    internal override PaneKind Kind => PaneKind.Terminal;
+    internal override bool SupportsClipboard => true;
     internal int ProcessId => connection!.ProcessId;
 
-    internal TerminalPane(Strings strings, IClipboard clipboard)
+    internal TerminalPane(Strings strings, IClipboard clipboard, ShellLaunch launch)
     {
         this.strings = strings;
         this.clipboard = clipboard;
+        this.launch = launch;
         Dock = DockStyle.Fill;
         Padding = new Padding(2);
         BackColor = Color.FromArgb(24, 26, 31);
@@ -46,12 +48,12 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
                 Math.Max(1, ClientSize.Width - Padding.Horizontal), Math.Max(1, ClientSize.Height - Padding.Vertical));
     }
 
-    internal async Task Start(TerminalEnvironment environment, ShellLaunch launch)
+    internal override async Task Start(WebViewProfile environment)
     {
         controller = await environment.CreateController(Handle);
         UpdateControllerBounds();
         controller.IsVisible = Visible;
-        controller.GotFocus += (_, _) => Activated?.Invoke(this);
+        controller.GotFocus += (_, _) => { if (ContainsFocus) NotifyActivated(); };
         Core.Settings.AreHostObjectsAllowed = false;
         Core.Settings.AreDefaultContextMenusEnabled = false;
         Core.Settings.AreDefaultScriptDialogsEnabled = false;
@@ -122,10 +124,11 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
                     var size = SizeFrom(root);
                     await connection.Resize(size.Cols, size.Rows);
                     break;
-                case "focus": Activated?.Invoke(this); break;
+                case "focus": if (ContainsFocus) NotifyActivated(); break;
+                case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
             }
         }
-        catch (Exception error) { if (!stopped) Failed?.Invoke(error.Message); }
+        catch (Exception error) { if (!stopped) NotifyFailure(error.Message); }
     }
 
     private (short Cols, short Rows) SizeFrom(JsonElement root)
@@ -152,26 +155,32 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
         catch (Exception error)
         {
-            Failed?.Invoke(error.Message);
+            NotifyFailure(error.Message);
             closing.Cancel(); // Unblock the native output drain even if the renderer failed.
         }
     }
 
-    internal void FocusTerminal() => controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
-    internal async Task Copy()
+    internal void FocusTerminal() => FocusPane();
+    internal override void FocusPane()
+    {
+        if (stopped || controller is null) return;
+        controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+        NotifyActivated();
+    }
+    internal override async Task Copy()
     {
         if (!IsPage(Core.Source)) return;
         var selection = JsonSerializer.Deserialize<string>(await Core.ExecuteScriptAsync("window.cmux.selection()"));
         if (!string.IsNullOrEmpty(selection)) clipboard.Write(selection);
     }
-    internal void Paste()
+    internal override void Paste()
     {
         if (!IsPage(Core.Source)) return;
         var text = clipboard.Read();
         if (text.Length > MaxInputCharacters) throw new InvalidOperationException(strings["PasteTooLarge"]);
         Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "paste", data = text }));
     }
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         if (stopped) return;
         stopped = true;

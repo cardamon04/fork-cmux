@@ -14,6 +14,7 @@ function resize() { if (document.body.clientWidth > 30 && document.body.clientHe
 term.onData(data => send({kind:'input', data}));
 term.onResize(size => send({kind:'resize', ...size}));
 term.textarea.addEventListener('focus', () => send({kind:'focus'}));
+term.element.addEventListener('pointerdown', event => { if (event.isTrusted) send({kind:'activate'}); });
 window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
