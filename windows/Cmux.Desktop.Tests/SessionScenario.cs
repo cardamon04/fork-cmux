@@ -13,7 +13,7 @@ internal static class SessionScenario
         await using var fixture = new BrowserFixture();
         using var first = new DesktopWindow(launch with { Directory = originalDirectory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
         using var second = new DesktopWindow(launch with { Directory = fallbackDirectory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
-        var ownedProcesses = new List<int>();
+        var ownedProcesses = new List<Process>();
         var ownedProfiles = new List<string>();
         FileStream? blocker = null;
         try
@@ -131,6 +131,7 @@ internal static class SessionScenario
                 early.Show();
                 await tracked.Task.WaitAsync(TimeSpan.FromSeconds(30));
                 await closed.WaitAsync(TimeSpan.FromSeconds(30));
+                Require(early.LastError is null, "Closing during startup reported: " + early.LastError);
                 VerifyGone(ownedProcesses, ownedProfiles);
                 Require(JsonSerializer.Deserialize<SessionSnapshot>(File.ReadAllText(earlyPath))!.Workspaces.Length == 1 && !Directory.Exists(early.ProfilePath), "Closing during startup lost the initialized layout or leaked its profile.");
             }
@@ -147,6 +148,7 @@ internal static class SessionScenario
                 var closed = Closed(guarded);
                 guarded.Close();
                 await closed.WaitAsync(TimeSpan.FromSeconds(30));
+                Require(guarded.LastError is null, "Closing the protected fallback reported: " + guarded.LastError);
                 VerifyGone(ownedProcesses, ownedProfiles);
                 Require(File.ReadAllText(path) == future, "Closing a fallback window overwrote future-version data.");
             }
@@ -157,6 +159,7 @@ internal static class SessionScenario
             blocker?.Dispose();
             foreach (var window in new[] { first, second })
                 if (!window.IsDisposed) { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); window.Close(); }
+            foreach (var process in ownedProcesses) process.Dispose();
             Directory.Delete(directory, recursive: true);
         }
     }
@@ -167,17 +170,20 @@ internal static class SessionScenario
         form.FormClosed += (_, _) => closed.TrySetResult();
         return closed.Task;
     }
-    private static void Track(DesktopWindow window, List<int> processes, List<string> profiles)
+    private static void Track(DesktopWindow window, List<Process> processes, List<string> profiles)
     {
-        processes.AddRange(window.Workspaces.SelectMany(w => w.Panes).OfType<TerminalPane>().Select(t => t.ProcessId));
+        foreach (var pane in window.Workspaces.SelectMany(w => w.Panes).OfType<TerminalPane>())
+        {
+            var process = Process.GetProcessById(pane.ProcessId);
+            _ = process.SafeHandle;
+            processes.Add(process);
+        }
         profiles.Add(window.ProfilePath);
         if (window.BrowserProfilePath is { } browser) profiles.Add(browser);
     }
-    private static void VerifyGone(List<int> processes, List<string> profiles)
+    private static void VerifyGone(List<Process> processes, List<string> profiles)
     {
-        foreach (var id in processes)
-            try { using var process = Process.GetProcessById(id); Require(process.HasExited, "A saved session shell survived close."); }
-            catch (ArgumentException) { }
+        foreach (var process in processes) Require(process.HasExited, "A saved session shell survived close: " + process.Id);
         foreach (var profile in profiles) Require(!Directory.Exists(profile), "A saved session profile survived close.");
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }

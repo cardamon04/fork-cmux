@@ -49,7 +49,10 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("ten-concurrent-terminals", TenTerminals),
 };
 if (args.Length > 1)
+{
     tests.Add(("powershell-utf8-and-exit", () => PowerShell(args[1])));
+    tests.Add(("powershell-close-during-startup", () => ClosePowerShellDuringStartup(args[1])));
+}
 if (args.Length > 2)
     tests = tests.Where(test => test.Name == args[2]).ToList();
 if (tests.Count == 0)
@@ -81,7 +84,7 @@ Console.WriteLine(JsonSerializer.Serialize(new
     os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
     architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
     runtime = Environment.Version.ToString(),
-    powershell = tests.Any(test => test.Name == "powershell-utf8-and-exit") ? "tested" : "not-run",
+    powershell = tests.Any(test => test.Name is "powershell-utf8-and-exit" or "powershell-close-during-startup") ? "tested" : "not-run",
     outcomes,
 }, new JsonSerializerOptions { WriteIndented = true }));
 return failed ? 1 : 0;
@@ -198,6 +201,46 @@ static async Task CloseRunningProcess()
         catch (ObjectDisposedException) { }
     }
     finally { session.Dispose(); }
+}
+
+static async Task ClosePowerShellDuringStartup(string executable)
+{
+    var directory = Directory.CreateTempSubdirectory("cmux-conpty-startup-").FullName;
+    try
+    {
+        for (var index = 0; index < 4; index++)
+        {
+            var output = new Transcript();
+            var history = Path.Combine(directory, "history.txt").Replace("'", "''");
+            var command = $"Set-PSReadLineOption -HistorySaveStyle SaveNothing -HistorySavePath '{history}'; Write-Output ('CMUX_'+'STARTUP_READY'); function global:prompt {{ 'CMUX_STARTUP_PROMPT> ' }}";
+            var session = ConPtySession.Start(executable, ["-NoLogo", "-NoProfile", "-NoExit", "-Command", command], directory, 80, 24, output.Append);
+            using var owned = Process.GetProcessById(session.ProcessId);
+            _ = owned.SafeHandle; // Keep the original process identity through teardown.
+            try
+            {
+                if (output.Contains("CMUX_STARTUP_READY")) throw new InvalidOperationException("The startup-close fixture was already ready.");
+                await Task.Run(session.Dispose).WaitAsync(TimeSpan.FromSeconds(30));
+                if (!owned.HasExited) throw new InvalidOperationException("The startup client survived ConPTY disposal.");
+            }
+            finally
+            {
+                // A failed regression must not leave its private shell running.
+                if (!owned.HasExited) { owned.Kill(); await owned.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); }
+                session.Dispose();
+            }
+        }
+    }
+    finally
+    {
+        // Client exit is asserted above; wait separately for the private
+        // fixture's filesystem handles to finish closing.
+        var cleanup = Stopwatch.StartNew();
+        while (true)
+        {
+            try { Directory.Delete(directory, recursive: true); break; }
+            catch (IOException) when (cleanup.Elapsed < TimeSpan.FromSeconds(2)) { await Task.Delay(50); }
+        }
+    }
 }
 
 static Task FailureCleanup()
