@@ -37,7 +37,17 @@
     "SessionDirectoryFallback": "A missing startup directory was replaced with the default directory.",
     "SessionUnavailable": "The saved layout could not be restored. This window will not overwrite it.",
     "SessionSaveFailed": "The layout could not be saved.",
-    "SessionCloseFailed": "The layout could not be saved. Save again? Choose Yes to retry, No to quit without saving, or Cancel to keep working."
+    "SessionCloseFailed": "The layout could not be saved. Save again? Choose Yes to retry, No to quit without saving, or Cancel to keep working.",
+    "Find": "Find in terminal",
+    "FindPlaceholder": "Search terminal output",
+    "FindPrevious": "Previous match",
+    "FindNext": "Next match",
+    "FindCase": "Match case",
+    "FindClose": "Close search",
+    "FindEmpty": "Enter search text.",
+    "FindMissing": "No matches.",
+    "FindResults": "Search results",
+    "FindSearching": "Searching…"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -77,7 +87,17 @@
     "SessionDirectoryFallback": "見つからない起動ディレクトリには既定の場所を使用しました。",
     "SessionUnavailable": "保存した作業配置を復元できません。このウィンドウでは元の保存ファイルを上書きしません。",
     "SessionSaveFailed": "作業配置を保存できませんでした。",
-    "SessionCloseFailed": "作業配置を保存できませんでした。もう一度保存しますか？「はい」で再試行、「いいえ」で保存せず終了、「キャンセル」で作業に戻ります。"
+    "SessionCloseFailed": "作業配置を保存できませんでした。もう一度保存しますか？「はい」で再試行、「いいえ」で保存せず終了、「キャンセル」で作業に戻ります。",
+    "Find": "端末内を検索",
+    "FindPlaceholder": "端末の出力を検索",
+    "FindPrevious": "前の一致",
+    "FindNext": "次の一致",
+    "FindCase": "大文字と小文字を区別",
+    "FindClose": "検索を閉じる",
+    "FindEmpty": "検索する文字列を入力してください。",
+    "FindMissing": "一致する文字列はありません。",
+    "FindResults": "検索結果",
+    "FindSearching": "検索中…"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -117,7 +137,17 @@
     "SessionDirectoryFallback": "Ein fehlendes Startverzeichnis wurde durch das Standardverzeichnis ersetzt.",
     "SessionUnavailable": "Das gespeicherte Layout konnte nicht wiederhergestellt werden. Dieses Fenster überschreibt es nicht.",
     "SessionSaveFailed": "Das Layout konnte nicht gespeichert werden.",
-    "SessionCloseFailed": "Das Layout konnte nicht gespeichert werden. Erneut speichern? Wählen Sie Ja zum Wiederholen, Nein zum Beenden ohne Speichern oder Abbrechen, um weiterzuarbeiten."
+    "SessionCloseFailed": "Das Layout konnte nicht gespeichert werden. Erneut speichern? Wählen Sie Ja zum Wiederholen, Nein zum Beenden ohne Speichern oder Abbrechen, um weiterzuarbeiten.",
+    "Find": "Im Terminal suchen",
+    "FindPlaceholder": "Terminalausgabe durchsuchen",
+    "FindPrevious": "Vorheriger Treffer",
+    "FindNext": "Nächster Treffer",
+    "FindCase": "Groß-/Kleinschreibung beachten",
+    "FindClose": "Suche schließen",
+    "FindEmpty": "Suchtext eingeben.",
+    "FindMissing": "Keine Treffer.",
+    "FindResults": "Suchergebnisse",
+    "FindSearching": "Suche läuft…"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -157,7 +187,17 @@
     "SessionDirectoryFallback": "Un dossier de démarrage introuvable a été remplacé par le dossier par défaut.",
     "SessionUnavailable": "La disposition enregistrée n’a pas pu être restaurée. Cette fenêtre ne la remplacera pas.",
     "SessionSaveFailed": "La disposition n’a pas pu être enregistrée.",
-    "SessionCloseFailed": "La disposition n’a pas pu être enregistrée. Réessayer ? Choisissez Oui pour réessayer, Non pour quitter sans enregistrer ou Annuler pour continuer à travailler."
+    "SessionCloseFailed": "La disposition n’a pas pu être enregistrée. Réessayer ? Choisissez Oui pour réessayer, Non pour quitter sans enregistrer ou Annuler pour continuer à travailler.",
+    "Find": "Rechercher dans le terminal",
+    "FindPlaceholder": "Rechercher dans la sortie du terminal",
+    "FindPrevious": "Résultat précédent",
+    "FindNext": "Résultat suivant",
+    "FindCase": "Respecter la casse",
+    "FindClose": "Fermer la recherche",
+    "FindEmpty": "Saisissez le texte à rechercher.",
+    "FindMissing": "Aucun résultat.",
+    "FindResults": "Résultats de recherche",
+    "FindSearching": "Recherche en cours…"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -197,7 +237,17 @@
     "SessionDirectoryFallback": "تم استبدال مجلد بدء تشغيل مفقود بالمجلد الافتراضي.",
     "SessionUnavailable": "تعذرت استعادة التخطيط المحفوظ. لن تستبدله هذه النافذة.",
     "SessionSaveFailed": "تعذر حفظ التخطيط.",
-    "SessionCloseFailed": "تعذر حفظ التخطيط. هل تريد إعادة المحاولة؟ اختر نعم للمحاولة مجددًا، أو لا للخروج دون حفظ، أو إلغاء الأمر لمتابعة العمل."
+    "SessionCloseFailed": "تعذر حفظ التخطيط. هل تريد إعادة المحاولة؟ اختر نعم للمحاولة مجددًا، أو لا للخروج دون حفظ، أو إلغاء الأمر لمتابعة العمل.",
+    "Find": "البحث في الطرفية",
+    "FindPlaceholder": "البحث في مخرجات الطرفية",
+    "FindPrevious": "التطابق السابق",
+    "FindNext": "التطابق التالي",
+    "FindCase": "مطابقة حالة الأحرف",
+    "FindClose": "إغلاق البحث",
+    "FindEmpty": "أدخل نص البحث.",
+    "FindMissing": "لا توجد تطابقات.",
+    "FindResults": "نتائج البحث",
+    "FindSearching": "جارٍ البحث…"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -237,7 +287,17 @@
     "SessionDirectoryFallback": "Se ha sustituido un directorio de inicio ausente por el directorio predeterminado.",
     "SessionUnavailable": "No se ha podido restaurar la distribución guardada. Esta ventana no la sobrescribirá.",
     "SessionSaveFailed": "No se ha podido guardar la distribución.",
-    "SessionCloseFailed": "No se ha podido guardar la distribución. ¿Volver a intentarlo? Elige Sí para reintentar, No para salir sin guardar o Cancelar para seguir trabajando."
+    "SessionCloseFailed": "No se ha podido guardar la distribución. ¿Volver a intentarlo? Elige Sí para reintentar, No para salir sin guardar o Cancelar para seguir trabajando.",
+    "Find": "Buscar en el terminal",
+    "FindPlaceholder": "Buscar en la salida del terminal",
+    "FindPrevious": "Coincidencia anterior",
+    "FindNext": "Coincidencia siguiente",
+    "FindCase": "Distinguir mayúsculas y minúsculas",
+    "FindClose": "Cerrar búsqueda",
+    "FindEmpty": "Escribe el texto que quieres buscar.",
+    "FindMissing": "No hay coincidencias.",
+    "FindResults": "Resultados de búsqueda",
+    "FindSearching": "Buscando…"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -277,7 +337,17 @@
     "SessionDirectoryFallback": "找不到的啟動目錄已替換為預設目錄。",
     "SessionUnavailable": "無法還原已儲存的配置。此視窗不會覆寫原檔。",
     "SessionSaveFailed": "無法儲存配置。",
-    "SessionCloseFailed": "無法儲存配置。要重試嗎？選擇「是」以重試、「否」以不儲存並結束，或「取消」以繼續工作。"
+    "SessionCloseFailed": "無法儲存配置。要重試嗎？選擇「是」以重試、「否」以不儲存並結束，或「取消」以繼續工作。",
+    "Find": "在終端機中搜尋",
+    "FindPlaceholder": "搜尋終端機輸出",
+    "FindPrevious": "上一個符合項目",
+    "FindNext": "下一個符合項目",
+    "FindCase": "區分大小寫",
+    "FindClose": "關閉搜尋",
+    "FindEmpty": "請輸入搜尋文字。",
+    "FindMissing": "找不到符合的項目。",
+    "FindResults": "搜尋結果",
+    "FindSearching": "搜尋中…"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -317,7 +387,17 @@
     "SessionDirectoryFallback": "找不到的启动目录已替换为默认目录。",
     "SessionUnavailable": "无法恢复已保存的布局。此窗口不会覆盖原文件。",
     "SessionSaveFailed": "无法保存布局。",
-    "SessionCloseFailed": "无法保存布局。要重试吗？选择“是”以重试、“否”以不保存并退出，或“取消”以继续工作。"
+    "SessionCloseFailed": "无法保存布局。要重试吗？选择“是”以重试、“否”以不保存并退出，或“取消”以继续工作。",
+    "Find": "在终端中搜索",
+    "FindPlaceholder": "搜索终端输出",
+    "FindPrevious": "上一个匹配项",
+    "FindNext": "下一个匹配项",
+    "FindCase": "区分大小写",
+    "FindClose": "关闭搜索",
+    "FindEmpty": "请输入搜索文本。",
+    "FindMissing": "没有匹配项。",
+    "FindResults": "搜索结果",
+    "FindSearching": "正在搜索…"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -357,6 +437,16 @@
     "SessionDirectoryFallback": "없는 시작 디렉터리를 기본 디렉터리로 바꿨습니다.",
     "SessionUnavailable": "저장된 배치를 복원할 수 없습니다. 이 창에서는 기존 파일을 덮어쓰지 않습니다.",
     "SessionSaveFailed": "배치를 저장할 수 없습니다.",
-    "SessionCloseFailed": "배치를 저장할 수 없습니다. 다시 저장할까요? 예를 선택하면 재시도하고, 아니요를 선택하면 저장하지 않고 종료하며, 취소를 선택하면 작업을 계속합니다."
+    "SessionCloseFailed": "배치를 저장할 수 없습니다. 다시 저장할까요? 예를 선택하면 재시도하고, 아니요를 선택하면 저장하지 않고 종료하며, 취소를 선택하면 작업을 계속합니다.",
+    "Find": "터미널에서 찾기",
+    "FindPlaceholder": "터미널 출력 검색",
+    "FindPrevious": "이전 일치 항목",
+    "FindNext": "다음 일치 항목",
+    "FindCase": "대소문자 구분",
+    "FindClose": "검색 닫기",
+    "FindEmpty": "검색할 텍스트를 입력하세요.",
+    "FindMissing": "일치하는 항목이 없습니다.",
+    "FindResults": "검색 결과",
+    "FindSearching": "검색 중…"
   }
 }

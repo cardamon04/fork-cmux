@@ -53,6 +53,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items.Add(new ToolStripSeparator());
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
+        AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
         var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
         footer.Items.Add(sessionStatus);
@@ -85,6 +86,7 @@ internal sealed class DesktopWindow : Form
         var allowed = Current?.Active?.SupportsClipboard == true;
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
+        toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
     }
 

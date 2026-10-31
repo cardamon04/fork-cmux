@@ -1,7 +1,15 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>cmux</title>
 <link rel="stylesheet" href="xterm.css"><link rel="stylesheet" href="terminal.css">
-</head><body><div id="terminal"></div>
+</head><body>
+<form id="find-bar" hidden role="search">
+<input id="find-query" type="text" maxlength="256" autocomplete="off" spellcheck="false">
+<button id="find-previous" type="button">↑</button><button id="find-next" type="button">↓</button>
+<label><input id="find-case" type="checkbox"><span id="find-case-label"></span></label>
+<output id="find-results" role="status" aria-live="polite"></output>
+<button id="find-close" type="button">×</button>
+</form><div id="terminal"></div>
 <script src="xterm.js"></script><script src="addon-fit.js"></script>
-<script src="addon-unicode11.js"></script><script src="terminal.js"></script>
+<script src="addon-unicode11.js"></script><script src="addon-search.js"></script>
+<script src="find.js"></script><script src="terminal.js"></script>
 </body></html>
