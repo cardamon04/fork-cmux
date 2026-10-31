@@ -16,9 +16,9 @@
 | WIN-008 | F-04 | Windowsのデスクトップ通知 | [CmuxNotifications](../Packages/macOS/CmuxNotifications/) | OS向け実装と通知からの復帰を要検証 |
 | WIN-009 | F-05 | CLIコマンド・入出力・エラーの互換 | [cli-contract](cli-contract.md)、[command tree](cli-command-tree.txt)、[CLI](../CLI/) | コマンド単位の対照表へ展開する必要あり |
 | WIN-010 | F-05 | API、識別子、認可、PowerShell・WSL2・SSHからの操作 | [CmuxControlSocket](../Packages/macOS/CmuxControlSocket/) | 通信方式・認可境界を設計する必要あり |
-| WIN-011 | F-06 | 内蔵ブラウザ、ナビゲーション、プロファイル、データ取り込み | [BrowserPanel](../Sources/Panels/BrowserPanel.swift)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | Windows向けエンジン候補を比較する必要あり |
-| WIN-012 | F-07 | スナップショット、要素参照、クリック、入力、JS評価 | [browser protocol](browser-repl/driver-protocol.md)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | 未実装 |
-| WIN-013 | F-07 | コンソール・ネットワーク確認と開発者向け機能 | [browser-repl](browser-repl/README.md)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | 未実装 |
+| WIN-011 | F-06 | 内蔵ブラウザ、ナビゲーション、プロファイル、データ取り込み | [BrowserPanel](../Sources/Panels/BrowserPanel.swift)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | WebView2の履歴・再読み込み・一時プロファイル分離を[技術検証](../Prototypes/WindowsBrowser/README.md)。製品GUI・取り込みは未実装 |
+| WIN-012 | F-07 | スナップショット、要素参照、クリック、入力、JS評価 | [browser protocol](browser-repl/driver-protocol.md)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | 実WebView2のAXツリー・CDP入力/クリック・JSを技術検証。要素参照・フレーム/所有権/権限など製品契約は未実装 |
+| WIN-013 | F-07 | コンソール・ネットワーク確認と開発者向け機能 | [browser-repl](browser-repl/README.md)、[CmuxBrowser](../Packages/macOS/CmuxBrowser/) | 実WebView2のCDPイベントを技術検証。製品のREPL/CLI/APIは未実装 |
 | WIN-014 | F-08 | SSHワークスペース、初期コマンド、再接続 | [CmuxRemoteWorkspace](../Packages/macOS/CmuxRemoteWorkspace/)、[CmuxRemoteSession](../Packages/macOS/CmuxRemoteSession/) | ssh.exeの起動だけで合格としない |
 | WIN-015 | F-08 | localhost転送、リモートブラウザ、ファイル・画像転送 | [CmuxRemoteDaemon](../Packages/macOS/CmuxRemoteDaemon/)、[CmuxSSHClipboardTrust](../Packages/macOS/CmuxSSHClipboardTrust/) | 未実装 |
 | WIN-016 | F-09 | Codexの対話、フック、通知、状態、再開、分割連携 | [agent-hooks](agent-hooks.md)、[agent-recovery](agent-recovery.md)、[CMUXAgentLaunch](../Packages/macOS/CMUXAgentLaunch/) | 実エージェントを用いた検証は未実行 |

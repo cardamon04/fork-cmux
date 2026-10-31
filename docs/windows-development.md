@@ -25,6 +25,7 @@
 ## 実装と検証の入口
 
 - [ConPTYプロトタイプの実行方法](../Prototypes/WindowsTerminal/README.md)
+- [既存候補の比較とブラウザ設計](windows-architecture-comparison.md)、[WebView2検証の実行方法](../Prototypes/WindowsBrowser/README.md)。この検証でもGUI方式の採用は確定しません。
 - [機能対照表の初期一覧](windows-feature-inventory.md)。28項目へ分解しましたが、網羅性の確認はまだ必要です。
 - [進捗・仕様確認用Draft PR #1](https://github.com/cardamon04/fork-cmux/pull/1)
 
@@ -53,3 +54,5 @@ python tests/test_windows_upstream_report.py -v
 ## 自動検証
 
 [Windows foundation](../.github/workflows/windows-foundation.yml)は、この実装に関係するPR更新時にPythonの追跡ツール試験とWindowsのConPTY試験を実行する定義です。GitHub側の実行結果はPRで確認します。定義があることと実行成功は別です。既存のmacOS本体のビルド・GUI試験はこの変更のローカル検証には含めません。
+
+[Windows browser engine](../.github/workflows/windows-browser.yml)は、実WebView2でナビゲーション・JS・日本語入力・trusted click・アクセシビリティ・console/network・プロファイル分離を検証します。表示する製品GUIや本家ドライバ全体の合格判定とは区別します。日本時間の朝を基準に本家mainを日次確認する継続設定が有効です。進捗・仕様確認・判断依頼はGitHubに記録します。
