@@ -95,6 +95,8 @@ internal sealed class SessionStore(string path) : IDisposable
     {
         var full = Path.GetFullPath(path);
         if (!IsLocalPath(full)) throw new IOException();
+        if (new DriveInfo(full[..3]).DriveType is DriveType.Network or DriveType.Unknown or DriveType.NoRootDirectory)
+            throw new IOException();
         var current = full[..3];
         foreach (var part in full[3..].Split('\\', StringSplitOptions.RemoveEmptyEntries))
         {

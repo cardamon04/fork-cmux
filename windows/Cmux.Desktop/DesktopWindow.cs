@@ -100,6 +100,7 @@ internal sealed class DesktopWindow : Form
     private async Task Initialize()
     {
         toolbar.Enabled = false;
+        sidebar.Enabled = false;
         try
         {
             SessionSnapshot? saved = null;
@@ -124,7 +125,7 @@ internal sealed class DesktopWindow : Form
             started.TrySetResult();
         }
         catch (Exception error) { ShowError(error.Message); started.TrySetException(error); }
-        finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
+        finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = sidebar.Enabled = true; }
     }
 
     private async Task RestoreSession(SessionSnapshot saved)
@@ -153,11 +154,19 @@ internal sealed class DesktopWindow : Form
             workspace.Active = workspace.Panes[item.ActivePane];
         }
         foreach (var workspace in Workspaces)
+        {
+            // ConPTY must start with the measured renderer dimensions. Hidden
+            // Dock controls have not been laid out and can report a tiny grid.
+            workspace.Visible = true;
+            workspace.BringToFront();
+            workspace.ApplyRestoredRatios();
             foreach (var pane in workspace.Panes)
             {
                 await StartPane(pane);
                 if (pane is BrowserPane browser) browser.NavigateFromAddress(addresses[browser]);
             }
+            workspace.Visible = false;
+        }
         if (saved.Workspaces.Length == 0) await NewWorkspace();
         else sidebar.SelectedIndex = saved.SelectedWorkspace;
         sessionStatus.Text = strings[missingDirectory ? "SessionDirectoryFallback" : "SessionRestored"];
@@ -393,7 +402,7 @@ internal sealed class DesktopWindow : Form
         {
             closingWindow = false;
             if (shutdownComplete) Close();
-            else toolbar.Enabled = true;
+            else toolbar.Enabled = sidebar.Enabled = true;
         }
     }
 }
