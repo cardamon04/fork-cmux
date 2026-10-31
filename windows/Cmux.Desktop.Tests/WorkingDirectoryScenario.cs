@@ -7,7 +7,7 @@ internal static class WorkingDirectoryScenario
     internal static async Task Run(ShellLaunch launch, List<string> passed, string? artifacts = null, string? only = null)
     {
         if (only is not (null or "pwsh" or "windows-powershell")) throw new ArgumentException("Unknown CWD shell case.");
-        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); }
+        if (only is null) { await ValidateBoundaries(launch, passed); await Regression(launch, passed); await Flood(launch, passed); }
         if (only is null or "pwsh") await Integration(launch, "pwsh", passed, artifacts);
         if (only is null or "windows-powershell")
         {
@@ -65,11 +65,11 @@ internal static class WorkingDirectoryScenario
             var newUri = new Uri(secondTarget).AbsoluteUri.Replace("'", "''");
             await Program.Command(first, "$cmuxOld='" + oldUri + "'; $cmuxNew='" + newUri + "'; 1..100 | ForEach-Object { [Console]::Write(([char]27)+']7;'+$cmuxOld+([char]7)); [Console]::Write(([char]27)+']7;'+$cmuxNew+([char]7)) }; Write-Output ('CWD_BURST_'+'DONE')");
             await Program.Contains(first, "CWD_BURST_DONE");
-            await first.SettleDirectory();
+            await first.CaptureWorkingDirectory();
             Require(first.WorkingDirectory == secondTarget, "A stale directory report replaced the latest valid directory.");
             await Program.Command(first, "[Console]::Write(([char]27)+']7;file://remote.invalid/C:/'+([char]7)); [Console]::Write(([char]27)+']7;file:///C:/missing-synthetic-cwd-5ec6c117'+([char]7)); Write-Output ('CWD_INVALID_'+'DONE')");
             await Program.Contains(first, "CWD_INVALID_DONE");
-            await first.SettleDirectory();
+            await first.CaptureWorkingDirectory();
             Require(first.WorkingDirectory == secondTarget, "An invalid report replaced the confirmed local directory.");
             Pass("cwd-" + name + "-burst-and-invalid-report-isolation", passed);
 
@@ -197,6 +197,66 @@ internal static class WorkingDirectoryScenario
                 if (!window.IsDisposed) { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); window.Close(); }
             Directory.Delete(directory, recursive: true);
         }
+    }
+    internal static async Task Flood(ShellLaunch launch, List<string> passed)
+    {
+        var directory = Directory.CreateTempSubdirectory("cmux-cwd-flood-").FullName;
+        var target = directory;
+        for (var index = 0; index < 64; index++) target = Directory.CreateDirectory(Path.Combine(target, "d")).FullName;
+        var path = Path.Combine(directory, "session.json");
+        using var window = new DesktopWindow(launch with { Directory = directory }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
+        Task? save = null;
+        TerminalPane? pane = null;
+        Process? owned = null;
+        var completedWhileReporting = false;
+        var savedDirectory = "";
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            pane = (TerminalPane)window.Current!.Active!;
+            owned = Process.GetProcessById(pane.ProcessId); _ = owned.SafeHandle;
+            await Program.Command(pane, "$cmuxFloodUri='" + new Uri(target).AbsoluteUri.Replace("'", "''") + "'; Write-Output ('CWD_FLOOD_'+'READY'); while ($true) { [Console]::Write(([char]27)+']7;'+$cmuxFloodUri+([char]7)) }");
+            await Program.Contains(pane, "CWD_FLOOD_READY");
+            save = window.ClickAction("SaveSession");
+            try
+            {
+                await save.WaitAsync(TimeSpan.FromSeconds(5)); completedWhileReporting = true;
+                savedDirectory = JsonSerializer.Deserialize<SessionSnapshot>(File.ReadAllText(path))!.Workspaces[0].Layout.Directory!;
+            }
+            catch (TimeoutException) { }
+        }
+        finally
+        {
+            var interrupted = pane is null;
+            try
+            {
+                if (pane is not null)
+                {
+                    foreach (var type in new[] { "keyDown", "keyUp" })
+                        await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key = "c", code = "KeyC", modifiers = 2, windowsVirtualKeyCode = 67, nativeVirtualKeyCode = 67 }));
+                    await Program.Until(async () => (await Program.Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>"), "The private report flood did not stop on Ctrl+C.");
+                    interrupted = true;
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (!interrupted && owned is { HasExited: false }) { owned.Kill(); await owned.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30)); }
+                    if (save is not null) await save.WaitAsync(TimeSpan.FromSeconds(30));
+                }
+                finally
+                {
+                    try { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); window.Close(); }
+                    finally { owned?.Dispose(); Directory.Delete(directory, recursive: true); }
+                }
+            }
+        }
+        Require(completedWhileReporting, "Saving waited for an unending directory-report stream to become idle.");
+        Require(savedDirectory == target, "The report stream's checkpoint saved the wrong directory.");
+        Require(window.LastError is null, "The report flood caused a product error.");
+        Pass("cwd-save-completes-during-continuous-reports", passed);
     }
     private static Task Closed(Form form)
     {

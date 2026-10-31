@@ -190,15 +190,19 @@ internal sealed class DesktopWindow : Form
         sessionStatus.Text = strings[missingDirectory ? "SessionDirectoryFallback" : "SessionRestored"];
     }
 
-    internal SessionSnapshot CaptureSession() => new(SessionSnapshot.CurrentVersion, workspaceSequence,
-        sidebar.SelectedIndex, Workspaces.Select(SessionLayout.Capture).ToArray());
+    internal SessionSnapshot CaptureSession(IReadOnlyDictionary<TerminalPane, string>? directories = null) => new(SessionSnapshot.CurrentVersion, workspaceSequence,
+        sidebar.SelectedIndex, Workspaces.Select(workspace => SessionLayout.Capture(workspace, directories)).ToArray());
 
     private async Task SaveSession()
     {
         if (session?.CanSave != true) return;
-        await Task.WhenAll(Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().Select(pane => pane.SettleDirectory()));
-        var snapshot = CaptureSession();
-        try { await Task.Run(() => session.Save(snapshot)); sessionStatus.Text = strings["SessionSaved"]; }
+        try
+        {
+            var captures = await Task.WhenAll(Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>()
+                .Select(async pane => (Pane: pane, Directory: await pane.CaptureWorkingDirectory())));
+            var snapshot = CaptureSession(captures.ToDictionary(item => item.Pane, item => item.Directory));
+            await Task.Run(() => session.Save(snapshot)); sessionStatus.Text = strings["SessionSaved"];
+        }
         catch (Exception) { sessionStatus.Text = strings["SessionSaveFailed"]; throw new IOException(strings["SessionSaveFailed"]); }
     }
 

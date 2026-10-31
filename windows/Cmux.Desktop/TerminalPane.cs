@@ -20,6 +20,7 @@ internal sealed class TerminalPane : WorkspacePane
     internal string WorkingDirectory { get; private set; }
     internal event Action? WorkingDirectoryChanged;
     private string? pendingDirectory;
+    private string? lastDirectoryReport;
     private long directoryRevision;
     private Task? directoryWorker;
     private CoreWebView2Controller? controller;
@@ -146,6 +147,7 @@ internal sealed class TerminalPane : WorkspacePane
                     var report = root.GetProperty("data").GetString();
                     if (report is null || report.Length > WorkingDirectoryReport.MaxUriCharacters) break;
                     pendingDirectory = report;
+                    lastDirectoryReport = report;
                     directoryRevision++;
                     if (directoryWorker is null || directoryWorker.IsCompleted) directoryWorker = UpdateDirectory();
                     break;
@@ -163,22 +165,31 @@ internal sealed class TerminalPane : WorkspacePane
             pendingDirectory = null;
             var revision = directoryRevision;
             var path = await Task.Run(() => WorkingDirectoryReport.Validate(report));
-            if (!stopped && revision == directoryRevision && path is not null
-                && !path.Equals(WorkingDirectory, StringComparison.OrdinalIgnoreCase))
-            {
-                WorkingDirectory = path;
-                WorkingDirectoryChanged?.Invoke();
-            }
+            ApplyDirectory(path, revision);
         }
     }
 
-    internal async Task SettleDirectory()
+    private void ApplyDirectory(string? path, long revision)
     {
-        while (directoryWorker is { } worker)
+        if (!stopped && revision == directoryRevision && path is not null
+            && !path.Equals(WorkingDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            await worker;
-            if (worker == directoryWorker) return;
+            WorkingDirectory = path;
+            WorkingDirectoryChanged?.Invoke();
         }
+    }
+
+    internal async Task<string> CaptureWorkingDirectory()
+    {
+        // Saving captures one report, rather than waiting for a live stream to
+        // become idle. Subsequent reports cannot replace this checkpoint value.
+        var report = lastDirectoryReport;
+        var fallback = WorkingDirectory;
+        var revision = directoryRevision;
+        if (report is null || stopped) return fallback;
+        var path = await Task.Run(() => WorkingDirectoryReport.Validate(report));
+        ApplyDirectory(path, revision);
+        return path ?? fallback;
     }
 
     private (short Cols, short Rows) SizeFrom(JsonElement root)

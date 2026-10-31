@@ -31,6 +31,7 @@ internal static class Program
         var cwdRegression = args is ["--cwd-regression"];
         var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
         var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
+        var cwdFlood = args is ["--cwd-flood"];
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -59,6 +60,13 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (cwdFlood)
+                {
+                    await WorkingDirectoryScenario.Flood(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (cwdOnly || cwdShell)
                 {
                     await WorkingDirectoryScenario.Run(shell, passed, cwdOnly && args.Length > 1 ? args[1] : null, cwdShell ? args.ElementAtOrDefault(1) ?? throw new ArgumentException("Select a CWD shell.") : null);
