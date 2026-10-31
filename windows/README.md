@@ -31,6 +31,8 @@ The desktop tests show their own application window and exercise toolbar actions
 
 The focused `Cmux.Desktop.Tests.exe --packaging-and-locales` check verifies regional/script fallback, localized profile refusal, supported catalogs and the actual distributed WebView2 notice. It is also part of the complete desktop suite.
 
+`Cmux.Desktop.Tests.exe --paste-limit` verifies that a permitted 32,768-character clipboard paste still reaches the shell when bracketed paste adds its protocol envelope. It uses a private clipboard fixture and leaves the pasted marker unexecuted, then closes that owned terminal. This check is also in the full suite.
+
 The UI catalog contains English, Japanese, German, French, Arabic, Spanish, Traditional/Simplified Chinese and Korean. The current Windows UI language selects a supported catalog, with English fallback. The terminal content follows the shell and font behavior.
 
 ## Boundaries and follow-up

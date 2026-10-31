@@ -8,6 +8,9 @@ namespace Cmux.Desktop;
 internal sealed class TerminalPane : UserControl, IAsyncDisposable
 {
     internal const string Page = "https://cmux-terminal.invalid/index.html";
+    private const int MaxInputCharacters = 32768;
+    private const string PasteStart = "\u001b[200~";
+    private const string PasteEnd = "\u001b[201~";
     private readonly Channel<string> output = Channel.CreateBounded<string>(32);
     private readonly TaskCompletionSource<(short Cols, short Rows)> ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource closing = new();
@@ -107,7 +110,12 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
                 case "ack": if (root.GetProperty("id").GetInt64() == sequence) ack?.TrySetResult(); break;
                 case "input" when connection is not null:
                     var text = root.GetProperty("data").GetString()!;
-                    if (text.Length > 32768) throw new InvalidOperationException(strings["PasteTooLarge"]);
+                    // xterm surrounds bracketed paste with protocol delimiters.
+                    // Apply the shared limit to content, retaining the envelope.
+                    var contentLength = text.StartsWith(PasteStart, StringComparison.Ordinal)
+                        && text.EndsWith(PasteEnd, StringComparison.Ordinal)
+                        ? text.Length - PasteStart.Length - PasteEnd.Length : text.Length;
+                    if (contentLength > MaxInputCharacters) throw new InvalidOperationException(strings["PasteTooLarge"]);
                     await connection.Write(text);
                     break;
                 case "resize" when connection is not null:
@@ -160,7 +168,7 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
     {
         if (!IsPage(Core.Source)) return;
         var text = clipboard.Read();
-        if (text.Length > 32768) throw new InvalidOperationException(strings["PasteTooLarge"]);
+        if (text.Length > MaxInputCharacters) throw new InvalidOperationException(strings["PasteTooLarge"]);
         Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "paste", data = text }));
     }
     public async ValueTask DisposeAsync()
