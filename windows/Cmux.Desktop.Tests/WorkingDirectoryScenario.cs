@@ -303,6 +303,9 @@ internal static class WorkingDirectoryScenario
             owned = Process.GetProcessById(pane.ProcessId); _ = owned.SafeHandle;
             await Program.Command(pane, "$cmuxFloodUri='" + new Uri(target).AbsoluteUri.Replace("'", "''") + "'; Write-Output ('CWD_FLOOD_'+'READY'); while ($true) { [Console]::Write(([char]27)+']7;'+$cmuxFloodUri+([char]7)) }");
             await Program.Contains(pane, "CWD_FLOOD_READY");
+            // READY precedes the loop's first report. Establish native receipt
+            // before asserting what a checkpoint under continuing load contains.
+            await Program.Until(async () => await pane.CaptureWorkingDirectory() == target, "The flood's target directory report was not received.");
             save = window.ClickAction("SaveSession");
             try
             {
