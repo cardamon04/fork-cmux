@@ -28,7 +28,8 @@ internal static class Program
         var pasteOnly = args is ["--paste-limit"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
-        var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape";
+        var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
+        if (args.ElementAtOrDefault(0) == "--ime-arabic") CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ar-EG");
         var cwdRegression = args is ["--cwd-regression"];
         var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
         var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
@@ -65,7 +66,7 @@ internal static class Program
                 Track(ownedProcesses, first.ProcessId);
                 if (imeOnly)
                 {
-                    await ImeScenario.Run(window, passed, args[0] == "--ime-only" ? null : args[0], args.ElementAtOrDefault(1));
+                    await ImeScenario.Run(window, passed, args[0] switch { "--ime-only" => null, "--ime-arabic" => "--ime-keys", _ => args[0] }, args.ElementAtOrDefault(1));
                     if (args[0] == "--ime-only") await ImeScenario.Fallback(shell, passed, args.ElementAtOrDefault(1));
                     Require(uiErrors.Count == 0 && window.LastError is null, "IME input reached a native UI error.");
                     await window.Shutdown().WaitAsync(Deadline);

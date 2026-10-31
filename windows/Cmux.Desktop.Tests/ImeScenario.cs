@@ -14,9 +14,14 @@ internal static class ImeScenario
         await window.ClickAction("Find");
         await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').focus()");
         await pane.Core.CallDevToolsProtocolMethodAsync("Input.insertText", JsonSerializer.Serialize(new { text = "IME_検索" }));
-        await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent.endsWith(' / 2')") == "true", "IME key fixture did not establish two search matches.");
+        try { await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent.endsWith(' / 2')") == "true", "IME key fixture did not establish two search matches."); }
+        catch (TimeoutException)
+        {
+            Console.Error.WriteLine("IME_FIND_LOCALE " + await pane.Core.ExecuteScriptAsync("({locale:document.documentElement.lang,count:document.getElementById('find-results').textContent})"));
+            throw;
+        }
         await pane.Core.ExecuteScriptAsync("window.imeKeys=[];window.addEventListener('keydown',e=>window.imeKeys.push({key:e.key,keyCode:e.keyCode,isComposing:e.isComposing,prevented:e.defaultPrevented}))");
-        if (only is null or "--ime-enter")
+        if (only is null or "--ime-enter" or "--ime-keys")
         {
             var before = await Position(pane);
             await Key(pane, "Enter", 229);
@@ -29,7 +34,7 @@ internal static class ImeScenario
             await Program.Until(async () => await Position(pane) == before, "Ordinary Shift+Enter stopped navigating after an IME key.");
             Pass("ime-processed-enter-preserves-search-selection");
         }
-        if (only is null or "--ime-escape")
+        if (only is null or "--ime-escape" or "--ime-keys")
         {
             await Key(pane, "Escape", 229);
             Console.WriteLine("IME_ESCAPE_TRACE " + await pane.Core.ExecuteScriptAsync("window.imeKeys"));
