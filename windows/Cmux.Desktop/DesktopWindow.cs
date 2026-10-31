@@ -15,6 +15,7 @@ internal sealed class DesktopWindow : Form
     private Task? initialize;
     private bool shuttingDown;
     private bool shutdownComplete;
+    private bool selectingWorkspace;
     private int workspaceSequence;
     internal Task Started => started.Task;
     internal WorkspaceView? Current => sidebar.SelectedItem as WorkspaceView;
@@ -118,11 +119,11 @@ internal sealed class DesktopWindow : Form
         sidebar.SelectedItem = workspace;
         var pane = AddPane(workspace, kind);
         workspace.Controls.Add(pane);
+        var selection = SelectPendingPane(workspace, pane);
         try
         {
             await StartPane(pane);
-            ActivatePane(workspace, pane);
-            if (Current == workspace) pane.FocusPane();
+            if (workspace.SelectionRevision == selection && Current == workspace) pane.FocusPane();
         }
         catch
         {
@@ -143,16 +144,28 @@ internal sealed class DesktopWindow : Form
     {
         WorkspacePane pane = kind == PaneKind.Browser
             ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, launch);
-        pane.Activated += active => ActivatePane(workspace, active);
+        pane.Activated += active =>
+        {
+            if (!selectingWorkspace && Current == workspace) ActivatePane(workspace, active);
+        };
         pane.Failed += ShowError;
         workspace.Panes.Add(pane);
-        ActivatePane(workspace, pane);
         return pane;
+    }
+
+    private long SelectPendingPane(WorkspaceView workspace, WorkspacePane pane)
+    {
+        // Establish focus after reparenting, before yielding to initialization.
+        // Later native selection changes own the final focus decision.
+        pane.Focus();
+        ActivatePane(workspace, pane);
+        return workspace.SelectionRevision;
     }
 
     private void ActivatePane(WorkspaceView workspace, WorkspacePane pane)
     {
         if (!workspace.Panes.Contains(pane)) return;
+        if (workspace.Active != pane) workspace.SelectionRevision++;
         workspace.Active = pane;
         foreach (var item in workspace.Panes)
             item.BackColor = item == pane ? Color.CornflowerBlue : Color.FromArgb(24, 26, 31);
@@ -161,9 +174,21 @@ internal sealed class DesktopWindow : Form
 
     private void SelectWorkspace()
     {
-        foreach (var workspace in Workspaces) workspace.Visible = workspace == Current;
-        Current?.BringToFront();
-        Current?.Active?.FocusPane();
+        if (selectingWorkspace) return;
+        var selected = Current;
+        var pane = selected?.Active;
+        selectingWorkspace = true;
+        try
+        {
+            // Visibility/layout can emit native focus events while projecting
+            // the saved selection. They must not replace that model state.
+            foreach (var workspace in Workspaces) workspace.Visible = workspace == selected;
+            selected?.BringToFront();
+            if (selected == Current) pane?.FocusPane();
+        }
+        finally { selectingWorkspace = false; }
+        if (selected != Current) { SelectWorkspace(); return; }
+        if (selected is not null && pane is not null) ActivatePane(selected, pane);
         UpdateActions();
     }
 
@@ -185,19 +210,20 @@ internal sealed class DesktopWindow : Form
         split.Panel2.Controls.Add(pane);
         var available = orientation == Orientation.Vertical ? split.Width : split.Height;
         split.SplitterDistance = Math.Clamp(available / 2, 0, Math.Max(0, available - split.SplitterWidth));
+        var selection = SelectPendingPane(workspace, pane);
         try
         {
             await StartPane(pane);
-            ActivatePane(workspace, pane);
-            if (Current == workspace) pane.FocusPane();
+            if (workspace.SelectionRevision == selection && Current == workspace) pane.FocusPane();
         }
         catch
         {
             split.Panel1.Controls.Remove(previous);
             parent.Controls.Remove(split);
             parent.Controls.Add(previous);
+            var selected = workspace.Active;
             workspace.Panes.Remove(pane);
-            ActivatePane(workspace, previous);
+            ActivatePane(workspace, selected is not null && workspace.Panes.Contains(selected) ? selected : previous);
             await pane.DisposeAsync();
             split.Dispose();
             throw;

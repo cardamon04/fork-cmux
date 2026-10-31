@@ -22,6 +22,8 @@ Temporary WebView2 profiles belong to this app instance and are removed after co
 
 Web browsing uses a separate profile from the fixed-origin terminal renderer. Web pages have no WebView native message channel or host objects. Top-level browsing accepts HTTP/HTTPS and a blank page; file URLs and external application schemes are blocked. Popups, downloads and permission requests currently show localized notices and are declined. Browser data belongs to the temporary browser profile and is removed on application exit. The app does not open a remote debugging TCP port.
 
+Opening a browser preserves a pane selected while startup is pending. A failed browser process shows a local recovery message; workspace switching, resizing and healthy terminals remain usable. Close the failed pane and open a browser again to recover. The app does not automatically reload or resubmit a failed page.
+
 ## Test
 
 ```powershell
@@ -34,6 +36,8 @@ dotnet run --project Prototypes/WindowsTerminal -- --self-test (Get-Command pwsh
 The desktop tests show their own application window and exercise toolbar actions, trusted Chromium keyboard/mouse input, selection and Copy, Ctrl+C, real interactive PowerShell/PSReadLine, Unicode, SGR rendering, resize propagation, pane/workspace isolation, teardown during output and ten live terminals. They use a temporary working directory and prompt, disable PSReadLine history persistence and point its history path to that directory, use `-NoProfile`, and inject an in-memory clipboard. They do not read or overwrite the user's clipboard. `terminal.png` captures only the application-owned renderer; it is not a screenshot of other desktop windows or proof of IME behavior.
 
 Browser tests use a private loopback HTTP fixture and the real browser toolbar, page input/clicks, history/reload, native inspector window, same-origin cookies across separate profiles, host-message denial, workspace switching, closing during an unfinished load and reopening. `--browser-only [artifact-directory]` runs this focused workflow. No public website or real account is used. `browser.png` is a renderer capture; `desktop.png`, when supported by Windows PrintWindow, captures only this test application's window. These images do not establish IME or full browser parity.
+
+`--browser-failures` runs the startup-selection and fatal-process regressions. It deliberately crashes only a test-owned browser after checking its PID and profile differ from the terminal's, then verifies UI dispatch, healthy shell output, recreation and profile cleanup. These checks also run in the full suite.
 
 The focused `Cmux.Desktop.Tests.exe --packaging-and-locales` check verifies regional/script fallback, localized profile refusal, supported catalogs and the actual distributed WebView2 notice. It is also part of the complete desktop suite.
 

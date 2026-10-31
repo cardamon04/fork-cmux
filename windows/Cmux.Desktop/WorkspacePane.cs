@@ -4,6 +4,11 @@ namespace Cmux.Desktop;
 
 internal abstract class WorkspacePane : UserControl, IAsyncDisposable
 {
+    protected WorkspacePane()
+    {
+        TabStop = true;
+        GotFocus += (_, _) => NotifyActivated();
+    }
     internal event Action<WorkspacePane>? Activated;
     internal event Action<string>? Failed;
     internal abstract CoreWebView2 Core { get; }

@@ -53,7 +53,7 @@ internal sealed class TerminalPane : WorkspacePane
         controller = await environment.CreateController(Handle);
         UpdateControllerBounds();
         controller.IsVisible = Visible;
-        controller.GotFocus += (_, _) => NotifyActivated();
+        controller.GotFocus += (_, _) => { if (ContainsFocus) NotifyActivated(); };
         Core.Settings.AreHostObjectsAllowed = false;
         Core.Settings.AreDefaultContextMenusEnabled = false;
         Core.Settings.AreDefaultScriptDialogsEnabled = false;
@@ -124,7 +124,8 @@ internal sealed class TerminalPane : WorkspacePane
                     var size = SizeFrom(root);
                     await connection.Resize(size.Cols, size.Rows);
                     break;
-                case "focus": NotifyActivated(); break;
+                case "focus": if (ContainsFocus) NotifyActivated(); break;
+                case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
             }
         }
         catch (Exception error) { if (!stopped) NotifyFailure(error.Message); }
@@ -160,7 +161,12 @@ internal sealed class TerminalPane : WorkspacePane
     }
 
     internal void FocusTerminal() => FocusPane();
-    internal override void FocusPane() => controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+    internal override void FocusPane()
+    {
+        if (stopped || controller is null) return;
+        controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+        NotifyActivated();
+    }
     internal override async Task Copy()
     {
         if (!IsPage(Core.Source)) return;

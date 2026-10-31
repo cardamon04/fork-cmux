@@ -29,7 +29,8 @@
     "PopupBlocked": "Opening a new window is not supported yet.",
     "DownloadBlocked": "Downloads are not supported yet.",
     "PermissionBlocked": "This browser permission is not available yet.",
-    "NavigationFailed": "The page could not be loaded."
+    "NavigationFailed": "The page could not be loaded.",
+    "BrowserFailed": "The browser stopped. Close this pane and open a browser again."
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -61,7 +62,8 @@
     "PopupBlocked": "新しいウィンドウを開く操作にはまだ対応していません。",
     "DownloadBlocked": "ダウンロードにはまだ対応していません。",
     "PermissionBlocked": "このブラウザ権限にはまだ対応していません。",
-    "NavigationFailed": "ページを読み込めませんでした。"
+    "NavigationFailed": "ページを読み込めませんでした。",
+    "BrowserFailed": "ブラウザが停止しました。このペインを閉じて、ブラウザを開き直してください。"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -93,7 +95,8 @@
     "PopupBlocked": "Neue Fenster werden noch nicht unterstützt.",
     "DownloadBlocked": "Downloads werden noch nicht unterstützt.",
     "PermissionBlocked": "Diese Browserberechtigung ist noch nicht verfügbar.",
-    "NavigationFailed": "Die Seite konnte nicht geladen werden."
+    "NavigationFailed": "Die Seite konnte nicht geladen werden.",
+    "BrowserFailed": "Der Browser wurde beendet. Schließen Sie diesen Bereich und öffnen Sie den Browser erneut."
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -125,7 +128,8 @@
     "PopupBlocked": "L’ouverture d’une nouvelle fenêtre n’est pas encore prise en charge.",
     "DownloadBlocked": "Les téléchargements ne sont pas encore pris en charge.",
     "PermissionBlocked": "Cette autorisation du navigateur n’est pas encore disponible.",
-    "NavigationFailed": "La page n’a pas pu être chargée."
+    "NavigationFailed": "La page n’a pas pu être chargée.",
+    "BrowserFailed": "Le navigateur s’est arrêté. Fermez ce volet et ouvrez à nouveau un navigateur."
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -157,7 +161,8 @@
     "PopupBlocked": "فتح نافذة جديدة غير مدعوم بعد.",
     "DownloadBlocked": "التنزيلات غير مدعومة بعد.",
     "PermissionBlocked": "إذن المتصفح هذا غير متاح بعد.",
-    "NavigationFailed": "تعذر تحميل الصفحة."
+    "NavigationFailed": "تعذر تحميل الصفحة.",
+    "BrowserFailed": "توقف المتصفح. أغلق هذا الجزء وافتح المتصفح من جديد."
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -189,7 +194,8 @@
     "PopupBlocked": "Aún no se admite abrir una ventana nueva.",
     "DownloadBlocked": "Aún no se admiten descargas.",
     "PermissionBlocked": "Este permiso del navegador aún no está disponible.",
-    "NavigationFailed": "No se pudo cargar la página."
+    "NavigationFailed": "No se pudo cargar la página.",
+    "BrowserFailed": "El navegador se detuvo. Cierra este panel y vuelve a abrir un navegador."
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -221,7 +227,8 @@
     "PopupBlocked": "尚不支援開啟新視窗。",
     "DownloadBlocked": "尚不支援下載。",
     "PermissionBlocked": "尚未提供此瀏覽器權限。",
-    "NavigationFailed": "無法載入頁面。"
+    "NavigationFailed": "無法載入頁面。",
+    "BrowserFailed": "瀏覽器已停止。請關閉此窗格並重新開啟瀏覽器。"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -253,7 +260,8 @@
     "PopupBlocked": "尚不支持打开新窗口。",
     "DownloadBlocked": "尚不支持下载。",
     "PermissionBlocked": "尚未提供此浏览器权限。",
-    "NavigationFailed": "无法加载页面。"
+    "NavigationFailed": "无法加载页面。",
+    "BrowserFailed": "浏览器已停止。请关闭此窗格并重新打开浏览器。"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -285,6 +293,7 @@
     "PopupBlocked": "새 창 열기는 아직 지원되지 않습니다.",
     "DownloadBlocked": "다운로드는 아직 지원되지 않습니다.",
     "PermissionBlocked": "이 브라우저 권한은 아직 사용할 수 없습니다.",
-    "NavigationFailed": "페이지를 불러올 수 없습니다."
+    "NavigationFailed": "페이지를 불러올 수 없습니다.",
+    "BrowserFailed": "브라우저가 중지되었습니다. 이 창을 닫고 브라우저를 다시 여세요."
   }
 }
