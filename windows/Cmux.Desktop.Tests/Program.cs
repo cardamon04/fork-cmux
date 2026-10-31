@@ -19,6 +19,7 @@ internal static class Program
             Thread.Sleep(TimeSpan.FromMinutes(2)); // Child fixture deliberately never consumes its input.
             return 0;
         }
+        if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         var directory = Directory.CreateTempSubdirectory("cmux-desktop-test-").FullName;
@@ -154,12 +155,7 @@ internal static class Program
                 }
                 Pass("pending-native-input-cancels-before-close", passed);
 
-                foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
-                {
-                    var strings = new Strings(CultureInfo.GetCultureInfo(locale));
-                    Require(!string.IsNullOrWhiteSpace(strings["SplitRight"]), "Missing localized action.");
-                    Require(strings.Format("Workspace", 7).Contains('7'), "Workspace placeholder missing.");
-                }
+                Require(PackagingAndLocales() == 0, "Application localization or distribution notices failed.");
                 Pass("localized-ui-actions", passed);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 if (args.Length > 0)
@@ -195,6 +191,54 @@ internal static class Program
         return exitCode;
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static int PackagingAndLocales()
+    {
+        var failures = new List<string>();
+        try
+        {
+            var macao = new Strings(CultureInfo.GetCultureInfo("zh-MO"));
+            var traditional = new Strings(CultureInfo.GetCultureInfo("zh-Hant"));
+            Require(macao["NewWorkspace"] == traditional["NewWorkspace"], "zh-MO did not select Traditional Chinese.");
+        }
+        catch (Exception error) { failures.Add(error.Message); }
+        var previousCulture = CultureInfo.CurrentUICulture;
+        var previousOverride = Environment.GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER");
+        var unused = Path.Combine(Path.GetTempPath(), "cmux-profile-refusal-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ja");
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", unused);
+            try { TerminalEnvironment.Create().GetAwaiter().GetResult(); throw new Exception("Profile override was accepted."); }
+            catch (InvalidOperationException error)
+            {
+                Require(error.Message == new Strings()["ProfileOverride"], "Profile refusal bypassed the Japanese UI catalog: " + error.Message);
+                Require(!Directory.Exists(unused), "Refused profile was opened.");
+            }
+        }
+        catch (Exception error) { failures.Add(error.Message); }
+        finally
+        {
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", previousOverride);
+            CultureInfo.CurrentUICulture = previousCulture;
+        }
+        try
+        {
+            var notice = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Microsoft.Web.WebView2.LICENSE.txt"));
+            Require(notice.Contains("Microsoft") && notice.Contains("Redistribution and use"), "WebView2 distribution notice is incomplete.");
+        }
+        catch (Exception error) { failures.Add(error.Message); }
+        using var stream = typeof(Strings).Assembly.GetManifestResourceStream("Cmux.Desktop.Strings.json")!;
+        var catalogs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(stream)!;
+        foreach (var locale in catalogs.Keys)
+        {
+            var strings = new Strings(CultureInfo.GetCultureInfo(locale));
+            foreach (var key in catalogs["en"].Keys)
+                if (!catalogs[locale].ContainsKey(key) || string.IsNullOrWhiteSpace(strings[key])) failures.Add("Missing localized key " + locale + ":" + key);
+            if (!strings.Format("Workspace", 7).Contains('7')) failures.Add("Missing workspace placeholder: " + locale);
+        }
+        foreach (var failure in failures) Console.Error.WriteLine("regression: " + failure);
+        return failures.Count == 0 ? 0 : 1;
+    }
     private static void Pass(string name, List<string> passed) { passed.Add(name); Console.WriteLine("passed: " + name); }
     private static async Task<string> Text(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.text()"))!;
     private static async Task<(int Cols, int Rows)> Size(TerminalPane pane)
