@@ -42,6 +42,7 @@ internal static class Program
             ("console-and-network-events", Events),
             ("isolated-profiles-and-cleanup", Profiles),
             ("rejected-navigation-and-script-errors", Errors),
+            ("ambient-profile-override-rejected", ProfileOverride),
         };
         if (filter is not null) tests = tests.Where(test => test.Name == filter).ToList();
         if (tests.Count == 0)
@@ -152,6 +153,7 @@ internal static class Program
         await using var first = await Create(parent);
         await first.Navigate(BrowserProbeSession.Origin + "/profile");
         await first.Evaluate("localStorage.setItem('probe-key','first'); document.cookie='probe-cookie=first; SameSite=Strict'; true");
+        Require((await first.Evaluate("document.cookie")).GetString() == "probe-cookie=first", "The source cookie was not stored, so isolation cannot be established.");
         await using var second = await Create(parent);
         await second.Navigate(BrowserProbeSession.Origin + "/profile");
         var state = await second.Evaluate("({value:localStorage.getItem('probe-key'),cookie:document.cookie})");
@@ -162,6 +164,36 @@ internal static class Program
         await first.DisposeAsync();
         await second.DisposeAsync();
         Require(!Directory.Exists(firstPath) && !Directory.Exists(secondPath), "Closed profiles were not removed after browser exit.");
+    }
+
+    private static async Task ProfileOverride(nint parent)
+    {
+        const string key = "WEBVIEW2_USER_DATA_FOLDER";
+        var previous = Environment.GetEnvironmentVariable(key);
+        var temporaryRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var overridePath = Path.Combine(temporaryRoot, "cmux-webview-override-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Environment.SetEnvironmentVariable(key, overridePath);
+            try
+            {
+                await using var unexpected = await Create(parent);
+                throw new InvalidOperationException("An ambient profile override was accepted.");
+            }
+            catch (InvalidOperationException error) when (error.Message.Contains(key)) { }
+            Require(!Directory.Exists(overridePath), "The rejected override profile was touched.");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(key, previous);
+            // Clean only the fresh fixture path if a regression accidentally
+            // created it. Never remove an ambient pre-existing override folder.
+            var resolved = Path.GetFullPath(overridePath);
+            if (!resolved.StartsWith(temporaryRoot, StringComparison.OrdinalIgnoreCase)
+                || !Path.GetFileName(resolved).StartsWith("cmux-webview-override-", StringComparison.Ordinal))
+                throw new InvalidOperationException("Refusing to remove a non-fixture override directory.");
+            if (Directory.Exists(resolved)) Directory.Delete(resolved, recursive: true);
+        }
     }
 
     private static async Task Errors(nint parent)
