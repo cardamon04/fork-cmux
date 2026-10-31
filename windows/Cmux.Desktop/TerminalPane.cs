@@ -17,7 +17,12 @@ internal sealed class TerminalPane : WorkspacePane
     private readonly Strings strings;
     private readonly IClipboard clipboard;
     private readonly ShellLaunch launch;
-    internal string LaunchDirectory => launch.Directory;
+    internal string WorkingDirectory { get; private set; }
+    internal event Action? WorkingDirectoryChanged;
+    private string? pendingDirectory;
+    private string? lastDirectoryReport;
+    private long directoryRevision;
+    private Task? directoryWorker;
     private CoreWebView2Controller? controller;
     private TerminalConnection? connection;
     private Task? pump;
@@ -34,6 +39,7 @@ internal sealed class TerminalPane : WorkspacePane
         this.strings = strings;
         this.clipboard = clipboard;
         this.launch = launch;
+        WorkingDirectory = launch.Directory;
         Dock = DockStyle.Fill;
         Padding = new Padding(2);
         BackColor = Color.FromArgb(24, 26, 31);
@@ -114,6 +120,7 @@ internal sealed class TerminalPane : WorkspacePane
                     Core.PostWebMessageAsJson(JsonSerializer.Serialize(new
                     {
                         kind = "configure", locale = System.Globalization.CultureInfo.CurrentUICulture.Name,
+                        cwdLimit = WorkingDirectoryReport.MaxUriCharacters,
                         strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching" }
                             .ToDictionary(key => key, key => strings[key]),
                     }));
@@ -136,9 +143,53 @@ internal sealed class TerminalPane : WorkspacePane
                     break;
                 case "focus": if (ContainsFocus) NotifyActivated(); break;
                 case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
+                case "cwd":
+                    var report = root.GetProperty("data").GetString();
+                    if (report is null || report.Length > WorkingDirectoryReport.MaxUriCharacters) break;
+                    pendingDirectory = report;
+                    lastDirectoryReport = report;
+                    directoryRevision++;
+                    if (directoryWorker is null || directoryWorker.IsCompleted) directoryWorker = UpdateDirectory();
+                    break;
             }
         }
         catch (Exception error) { if (!stopped) NotifyFailure(error.Message); }
+    }
+
+    private async Task UpdateDirectory()
+    {
+        // One validation worker and one latest report per pane bound disk work.
+        // A slow old report cannot replace a newer report after its await.
+        while (!stopped && pendingDirectory is { } report)
+        {
+            pendingDirectory = null;
+            var revision = directoryRevision;
+            var path = await Task.Run(() => WorkingDirectoryReport.Validate(report));
+            ApplyDirectory(path, revision);
+        }
+    }
+
+    private void ApplyDirectory(string? path, long revision)
+    {
+        if (!stopped && revision == directoryRevision && path is not null
+            && !path.Equals(WorkingDirectory, StringComparison.Ordinal))
+        {
+            WorkingDirectory = path;
+            WorkingDirectoryChanged?.Invoke();
+        }
+    }
+
+    internal async Task<string> CaptureWorkingDirectory()
+    {
+        // Saving captures one report, rather than waiting for a live stream to
+        // become idle. Subsequent reports cannot replace this checkpoint value.
+        var report = lastDirectoryReport;
+        var fallback = WorkingDirectory;
+        var revision = directoryRevision;
+        if (report is null || stopped) return fallback;
+        var path = await Task.Run(() => WorkingDirectoryReport.Validate(report));
+        ApplyDirectory(path, revision);
+        return path ?? fallback;
     }
 
     private (short Cols, short Rows) SizeFrom(JsonElement root)

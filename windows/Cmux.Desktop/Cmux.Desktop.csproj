@@ -13,6 +13,7 @@
     <ProjectReference Include="../Cmux.Terminal/Cmux.Terminal.csproj" />
     <InternalsVisibleTo Include="Cmux.Desktop.Tests" />
     <EmbeddedResource Include="Strings.json" />
+    <EmbeddedResource Include="PowerShellIntegration.ps1" />
     <Content Include="Assets/**" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="$(PkgMicrosoft_Web_WebView2)/LICENSE.txt" Link="Microsoft.Web.WebView2.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/xterm/lib/xterm.js" Link="Assets/xterm.js" CopyToOutputDirectory="PreserveNewest" />

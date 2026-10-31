@@ -28,6 +28,12 @@ internal static class Program
         var pasteOnly = args is ["--paste-limit"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
+        var cwdRegression = args is ["--cwd-regression"];
+        var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
+        var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
+        var cwdFlood = args is ["--cwd-flood"];
+        var cwdCase = args is ["--cwd-case"];
+        var cwdOracle = args is ["--cwd-oracle"];
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -47,7 +53,7 @@ internal static class Program
         using var window = new DesktopWindow(shell, clipboard) { ShowInTaskbar = false };
         window.Shown += async (_, _) =>
         {
-            var pids = new List<int>();
+            var ownedProcesses = new List<Process>();
             var profile = "";
             var passed = new List<string>();
             try
@@ -55,7 +61,44 @@ internal static class Program
                 await window.Started.WaitAsync(Deadline);
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
-                pids.Add(first.ProcessId);
+                Track(ownedProcesses, first.ProcessId);
+                if (cwdOracle)
+                {
+                    await WorkingDirectoryScenario.OracleBoundary(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (cwdCase)
+                {
+                    await WorkingDirectoryScenario.ReportedCase(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (cwdFlood)
+                {
+                    await WorkingDirectoryScenario.Flood(shell, passed);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (cwdOnly || cwdShell)
+                {
+                    await WorkingDirectoryScenario.Run(shell, passed, cwdOnly && args.Length > 1 ? args[1] : null, cwdShell ? args.ElementAtOrDefault(1) ?? throw new ArgumentException("Select a CWD shell.") : null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Directory tracking reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (cwdRegression)
+                {
+                    await WorkingDirectoryScenario.Regression(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Directory regression reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (searchClipboard)
                 {
                     await TerminalSearchScenario.RunClipboard(window, clipboard, passed, args.Length > 1 ? args[1] : null);
@@ -103,7 +146,7 @@ internal static class Program
                 if (browserOnly)
                 {
                     await window.ClickAction("NewWorkspace");
-                    pids.Add(((TerminalPane)window.Current!.Active!).ProcessId);
+                    Track(ownedProcesses, ((TerminalPane)window.Current!.Active!).ProcessId);
                     await BrowserScenario.Run(window, passed, args.Length > 1 ? args[1] : null);
                     await window.Shutdown().WaitAsync(Deadline);
                     Require(!Directory.Exists(profile), "Application profile was not removed.");
@@ -113,7 +156,7 @@ internal static class Program
                 }
                 if (pasteOnly)
                 {
-                    await PasteLimit(window, clipboard, pids);
+                    await PasteLimit(window, clipboard, ownedProcesses);
                     await window.Shutdown().WaitAsync(Deadline);
                     Require(!Directory.Exists(profile), "Application profile was not removed.");
                     exitCode = 0;
@@ -133,7 +176,7 @@ internal static class Program
                 await window.ClickAction("SplitRight");
                 Require(window.Current.Panes.Count == 2, "Split button did not create a second terminal.");
                 var second = (TerminalPane)window.Current.Active!;
-                pids.Add(second.ProcessId);
+                Track(ownedProcesses, second.ProcessId);
                 Require(window.Current.Active == second, "Selection precondition failed.");
                 await Mouse(first, "mousePressed", 80, 80, 1);
                 await Mouse(first, "mouseReleased", 80, 80, 0);
@@ -151,7 +194,7 @@ internal static class Program
                 Require(!(await Text(second)).Contains("日本語😀_ready"), "Terminal outputs were mixed.");
                 await second.Core.ExecuteScriptAsync("window.cmux.focus()");
                 await Until(() => Task.FromResult(window.Current.Active == second), "Focus did not select the second pane.");
-                using var secondProcess = Process.GetProcessById(second.ProcessId);
+                var secondProcess = ownedProcesses.Single(process => process.Id == second.ProcessId);
                 await window.ClickAction("ClosePane");
                 await secondProcess.WaitForExitAsync().WaitAsync(Deadline);
                 Require(window.Current.Panes.Count == 1, "Closing a split did not collapse it.");
@@ -160,7 +203,7 @@ internal static class Program
 
                 await window.ClickAction("SplitBelow");
                 var below = (TerminalPane)window.Current.Active!;
-                pids.Add(below.ProcessId);
+                Track(ownedProcesses, below.ProcessId);
                 Require(window.Current.Controls[0] is SplitContainer { Orientation: Orientation.Horizontal }, "Split below used the wrong layout.");
                 await Command(below, "Write-Output ('BELOW_' + 'PANE')");
                 await Contains(below, "BELOW_PANE");
@@ -169,7 +212,7 @@ internal static class Program
 
                 await window.ClickAction("NewWorkspace");
                 var other = (TerminalPane)window.Current!.Active!;
-                pids.Add(other.ProcessId);
+                Track(ownedProcesses, other.ProcessId);
                 clipboard.Text = "Write-Output ('PASTE_' + 'WORKSPACE')\r";
                 await window.ClickAction("Paste");
                 await Contains(other, "PASTE_WORKSPACE");
@@ -194,7 +237,7 @@ internal static class Program
 
                 await window.ClickAction("NewWorkspace");
                 var noisy = (TerminalPane)window.Current!.Active!;
-                pids.Add(noisy.ProcessId);
+                Track(ownedProcesses, noisy.ProcessId);
                 await Command(noisy, "while ($true) { [Console]::Write('LOAD_') }");
                 await Contains(noisy, "LOAD_LOAD_");
                 foreach (var type in new[] { "keyDown", "keyUp" })
@@ -212,7 +255,7 @@ internal static class Program
                 {
                     await window.ClickAction("NewWorkspace");
                     var pane = (TerminalPane)window.Current!.Active!;
-                    pids.Add(pane.ProcessId);
+                    Track(ownedProcesses, pane.ProcessId);
                     await Command(pane, $"Write-Output ('LIVE_' + '{index}')");
                     await Contains(pane, $"LIVE_{index}");
                 }
@@ -220,8 +263,8 @@ internal static class Program
                 foreach (var workspace in window.Workspaces)
                     foreach (var pane in workspace.Panes.Cast<TerminalPane>())
                     {
-                        using var process = Process.GetProcessById(pane.ProcessId);
-                        Require(!process.HasExited, "A workspace shell exited while switching.");
+                        var process = ownedProcesses.Single(owned => owned.Id == pane.ProcessId);
+                        Require(!process.WaitForExit(0), "A workspace shell exited while switching.");
                     }
                 window.SelectWorkspace(0);
                 await Contains(first, "AFTER_CLOSE");
@@ -236,7 +279,7 @@ internal static class Program
                 }))
                 {
                     await blockedReady.Task.WaitAsync(Deadline);
-                    pids.Add(blocked.ProcessId);
+                    Track(ownedProcesses, blocked.ProcessId);
                     using var cancelInput = new CancellationTokenSource();
                     var write = blocked.WriteAsync(new string('x', 4_000_000), cancelInput.Token);
                     Require(!write.IsCompleted, "The no-reader fixture did not produce a pending pipe write.");
@@ -246,7 +289,7 @@ internal static class Program
                 }
                 Pass("pending-native-input-cancels-before-close", passed);
 
-                await PasteLimit(window, clipboard, pids);
+                await PasteLimit(window, clipboard, ownedProcesses);
                 Pass("bracketed-paste-content-limit", passed);
 
                 Require(PackagingAndLocales() == 0, "Application localization or distribution notices failed.");
@@ -256,6 +299,7 @@ internal static class Program
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
+                await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)
@@ -269,9 +313,8 @@ internal static class Program
                 await window.Shutdown().WaitAsync(Deadline);
                 Require(!Directory.Exists(profile), "Application profile was not removed.");
                 Require(window.BrowserProfilePath is { } browserProfile && !Directory.Exists(browserProfile), "Browser profile was not removed.");
-                foreach (var pid in pids)
-                    try { using var process = Process.GetProcessById(pid); Require(process.HasExited, "Owned shell is still running."); }
-                    catch (ArgumentException) { }
+                foreach (var process in ownedProcesses)
+                    Require(process.WaitForExit(0), "The original owned shell is still running.");
                 Pass("owned-process-and-profile-teardown", passed);
                 Console.WriteLine(JsonSerializer.Serialize(new { os = Environment.OSVersion.VersionString, runtime = Environment.Version.ToString(), tests = passed }));
                 exitCode = 0;
@@ -287,18 +330,25 @@ internal static class Program
             {
                 try { await window.Shutdown().WaitAsync(Deadline); } catch (Exception error) { Console.Error.WriteLine("cleanup: " + error); }
                 window.Close();
+                foreach (var process in ownedProcesses) process.Dispose();
                 try { Directory.Delete(directory, recursive: true); } catch (Exception error) { Console.Error.WriteLine(error); exitCode = 1; }
             }
         };
         Application.Run(window);
         return exitCode;
     }
+    private static Process Track(List<Process> processes, int pid)
+    {
+        var process = Process.GetProcessById(pid);
+        try { _ = process.SafeHandle; processes.Add(process); return process; }
+        catch { process.Dispose(); throw; }
+    }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-    private static async Task PasteLimit(DesktopWindow window, MemoryClipboard clipboard, List<int> pids)
+    private static async Task PasteLimit(DesktopWindow window, MemoryClipboard clipboard, List<Process> ownedProcesses)
     {
         await window.ClickAction("NewWorkspace");
         var pane = (TerminalPane)window.Current!.Active!;
-        pids.Add(pane.ProcessId);
+        Track(ownedProcesses, pane.ProcessId);
         await Until(async () => (await Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "Paste shell was not ready.");
         await pane.Core.ExecuteScriptAsync("window.pasteLength=0;term.onData(data=>window.pasteLength=data.length);term.write('\\x1b[?2004h');");
         await Until(async () => await pane.Core.ExecuteScriptAsync("term.modes.bracketedPasteMode") == "true", "Bracketed paste was not enabled.");

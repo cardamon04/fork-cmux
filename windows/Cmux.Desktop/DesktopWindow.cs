@@ -11,6 +11,7 @@ internal sealed class DesktopWindow : Form
     private readonly Panel content = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel status = new();
     private readonly ToolStripStatusLabel sessionStatus = new() { AutoToolTip = true };
+    private readonly ToolStripStatusLabel directoryStatus = new() { Name = "WorkingDirectory", Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private WebViewProfile? environment;
     private WebViewProfile? browserEnvironment;
@@ -56,6 +57,7 @@ internal sealed class DesktopWindow : Form
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
         var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
+        footer.Items.Add(directoryStatus);
         footer.Items.Add(sessionStatus);
         Controls.Add(content);
         Controls.Add(sidebar);
@@ -88,6 +90,8 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Paste"]!.Enabled = allowed;
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
+        directoryStatus.Text = Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "";
+        directoryStatus.ToolTipText = directoryStatus.Text;
     }
 
     private async Task Run(Func<Task> action)
@@ -186,14 +190,19 @@ internal sealed class DesktopWindow : Form
         sessionStatus.Text = strings[missingDirectory ? "SessionDirectoryFallback" : "SessionRestored"];
     }
 
-    internal SessionSnapshot CaptureSession() => new(SessionSnapshot.CurrentVersion, workspaceSequence,
-        sidebar.SelectedIndex, Workspaces.Select(SessionLayout.Capture).ToArray());
+    internal SessionSnapshot CaptureSession(IReadOnlyDictionary<TerminalPane, string>? directories = null) => new(SessionSnapshot.CurrentVersion, workspaceSequence,
+        sidebar.SelectedIndex, Workspaces.Select(workspace => SessionLayout.Capture(workspace, directories)).ToArray());
 
     private async Task SaveSession()
     {
         if (session?.CanSave != true) return;
-        var snapshot = CaptureSession();
-        try { await Task.Run(() => session.Save(snapshot)); sessionStatus.Text = strings["SessionSaved"]; }
+        try
+        {
+            var captures = await Task.WhenAll(Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>()
+                .Select(async pane => (Pane: pane, Directory: await pane.CaptureWorkingDirectory())));
+            var snapshot = CaptureSession(captures.ToDictionary(item => item.Pane, item => item.Directory));
+            await Task.Run(() => session.Save(snapshot)); sessionStatus.Text = strings["SessionSaved"];
+        }
         catch (Exception) { sessionStatus.Text = strings["SessionSaveFailed"]; throw new IOException(strings["SessionSaveFailed"]); }
     }
 
@@ -243,6 +252,8 @@ internal sealed class DesktopWindow : Form
             if (!selectingWorkspace && Current == workspace) ActivatePane(workspace, active);
         };
         pane.Failed += ShowError;
+        if (pane is TerminalPane terminal)
+            terminal.WorkingDirectoryChanged += () => { if (Current?.Active == terminal) UpdateActions(); };
         workspace.Panes.Add(pane);
         return pane;
     }
@@ -298,7 +309,10 @@ internal sealed class DesktopWindow : Form
         if (Current is not { Active: { } previous } workspace) return;
         var parent = previous.Parent!;
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = orientation, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
-        var pane = AddPane(workspace, kind);
+        var paneLaunch = previous is TerminalPane terminal && kind == PaneKind.Terminal
+            && SessionStore.IsExistingLocalDirectory(terminal.WorkingDirectory)
+            ? launch with { Directory = terminal.WorkingDirectory } : launch;
+        var pane = AddPane(workspace, kind, paneLaunch);
         parent.Controls.Remove(previous);
         parent.Controls.Add(split);
         split.Panel1.Controls.Add(previous);

@@ -11,7 +11,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYとxterm.jsをアプリへ統合。対話PowerShell/PSReadLine・Unicode・SGR色・サイズ伝播・終了を実操作で検証。IME・全端末互換は未検証 |
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
 | WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | スクロール・選択・コピー/貼り付けに加え、ペイン内の文字列検索・前後移動・大文字小文字切替を実装。実PowerShell出力・スクロールバック・Unicode・折り返し・該当なし・選択コピー・ワークスペース分離・終了・上限を検証。正規表現・全ペイン検索・検索キー設定・OSクリップボード・画像・Ghosttyとの差は未検証/未実装 |
-| WIN-006 | F-03 | CWD、Git、PR、待受ポート、最新通知の表示 | [README](../README.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 未実装 |
+| WIN-006 | F-03 | CWD、Git、PR、待受ポート、最新通知の表示 | [README](../README.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 部分実装。PowerShell 7/Windows PowerShell 5.1 のローカルCWD追跡・選択ペインの表示・分割先への継承を実装。既存プロンプト・終了状態・ペイン分離・不正/リモート/junction報告の拒否を実動作で検証。Git・PR・ポート・通知、WSL/SSHは未対応 |
 | WIN-007 | F-04 | 通知の受信、未読、ペイン強調、一覧、移動 | [TerminalNotificationStore](../Sources/TerminalNotificationStore.swift)、[CmuxNotifications](../Packages/macOS/CmuxNotifications/) | 未実装 |
 | WIN-008 | F-04 | Windowsのデスクトップ通知 | [CmuxNotifications](../Packages/macOS/CmuxNotifications/) | OS向け実装と通知からの復帰を要検証 |
 | WIN-009 | F-05 | CLIコマンド・入出力・エラーの互換 | [cli-contract](cli-contract.md)、[command tree](cli-command-tree.txt)、[CLI](../CLI/) | コマンド単位の対照表へ展開する必要あり |
@@ -24,7 +24,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-016 | F-09 | Codexの対話、フック、通知、状態、再開、分割連携 | [agent-hooks](agent-hooks.md)、[agent-recovery](agent-recovery.md)、[CMUXAgentLaunch](../Packages/macOS/CMUXAgentLaunch/) | 実エージェントを用いた検証は未実行 |
 | WIN-017 | F-09 | Claude Codeの対話、フック、通知、状態、再開、チーム連携 | [agent-hooks](agent-hooks.md)、[CMUXAgentLaunch](../Packages/macOS/CMUXAgentLaunch/) | 実エージェントを用いた検証は未実行 |
 | WIN-018 | F-09 | その他の本家エージェント・チャット連携 | [CmuxAgentChat](../Packages/Shared/CmuxAgentChat/)、[agent-messages](agent-messages.md) | 提供元と対応機能を列挙する必要あり |
-| WIN-019 | F-10 | レイアウト・CWD・履歴・ブラウザ状態の保存と復元 | [SessionPersistence](../Sources/SessionPersistence.swift)、[agent-recovery](agent-recovery.md) | 部分実装。[Windowsアプリ](../windows/README.md)で終了時保存・次回起動時復元、混在分割・比率・選択・起動ディレクトリ・ブラウザURLに対応。シェル内cd、履歴・スクロールバック、ブラウザ履歴・ログイン状態、クラッシュ復旧等は未対応。F-10全体の合格ではない |
+| WIN-019 | F-10 | レイアウト・CWD・履歴・ブラウザ状態の保存と復元 | [SessionPersistence](../Sources/SessionPersistence.swift)、[agent-recovery](agent-recovery.md) | 部分実装。[Windowsアプリ](../windows/README.md)で終了時保存・次回起動時復元、混在分割・比率・選択・PowerShellのローカルcd後のディレクトリ・ブラウザURLに対応。保存項目は既存Directoryのままでコマンド/出力/履歴を追加保存しない。履歴・スクロールバック、ブラウザ履歴・ログイン状態、クラッシュ復旧等は未対応。F-10全体の合格ではない |
 | WIN-020 | F-10 | 実行中プロセスの維持、再接続、エージェント再開 | [CmuxAgentSessionStore](../Packages/macOS/CmuxAgentSessionStore/)、[agent-recovery](agent-recovery.md) | 未実装 |
 | WIN-021 | F-11 | Ghostty設定、フォント、テーマ、色、設定再読み込み | [configuration](configuration.md)、[CmuxSettings](../Packages/macOS/CmuxSettings/) | 設定キーごとの互換表が必要 |
 | WIN-022 | F-11 | Windows向けキー割り当て、変更、カスタムコマンド、補完 | [ghostty-keybindings](ghostty-keybindings.md)、[configuration](configuration.md) | Ctrl+Cなどの通常操作とIMEを含めて検証する必要あり |

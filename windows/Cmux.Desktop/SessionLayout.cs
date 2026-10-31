@@ -2,7 +2,7 @@ namespace Cmux.Desktop;
 
 internal static class SessionLayout
 {
-    internal static WorkspaceSnapshot Capture(WorkspaceView workspace)
+    internal static WorkspaceSnapshot Capture(WorkspaceView workspace, IReadOnlyDictionary<TerminalPane, string>? directories = null)
     {
         var panes = new List<WorkspacePane>();
         LayoutSnapshot Visit(Control control)
@@ -12,7 +12,7 @@ internal static class SessionLayout
                     Ratio: workspace.SplitRatio(split), First: Visit(split.Panel1.Controls[0]), Second: Visit(split.Panel2.Controls[0]));
             var pane = (WorkspacePane)control;
             panes.Add(pane);
-            return pane is TerminalPane terminal ? new("terminal", Directory: terminal.LaunchDirectory)
+            return pane is TerminalPane terminal ? new("terminal", Directory: directories is null ? terminal.WorkingDirectory : directories[terminal])
                 : new("browser", Url: ((BrowserPane)pane).SessionAddress);
         }
         var layout = Visit(workspace.Controls[0]);
