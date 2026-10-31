@@ -10,17 +10,21 @@ term.loadAddon(new Unicode11Addon.Unicode11Addon());
 term.unicode.activeVersion = '11';
 term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
-function resize() { if (document.body.clientWidth > 30 && document.body.clientHeight > 30) fit.fit(); }
+const find = createTerminalSearch(term);
+function resize() { const host=document.getElementById('terminal'); if (host.clientWidth > 30 && host.clientHeight > 30) fit.fit(); }
 term.onData(data => send({kind:'input', data}));
 term.onResize(size => send({kind:'resize', ...size}));
 term.textarea.addEventListener('focus', () => send({kind:'focus'}));
 term.element.addEventListener('pointerdown', event => { if (event.isTrusted) send({kind:'activate'}); });
+document.getElementById('find-bar').addEventListener('pointerdown', event => { if (event.isTrusted) send({kind:'activate'}); });
 window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
   else if (m.kind === 'paste') term.paste(m.data);
+  else if (m.kind === 'configure') find.configure(m.strings, m.locale);
+  else if (m.kind === 'find') find.open();
 });
-new ResizeObserver(resize).observe(document.body);
+new ResizeObserver(resize).observe(document.getElementById('terminal'));
 resize();
 send({kind:'ready', cols:term.cols, rows:term.rows});
 // Read-only renderer inspection also supports application-level integration tests.

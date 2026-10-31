@@ -89,6 +89,7 @@ internal sealed class TerminalPane : WorkspacePane
             ["/index.html"] = "text/html", ["/terminal.js"] = "text/javascript",
             ["/terminal.css"] = "text/css", ["/xterm.js"] = "text/javascript", ["/xterm.css"] = "text/css",
             ["/addon-fit.js"] = "text/javascript", ["/addon-unicode11.js"] = "text/javascript",
+            ["/addon-search.js"] = "text/javascript", ["/find.js"] = "text/javascript",
         };
         if (uri.GetLeftPart(UriPartial.Authority) != "https://cmux-terminal.invalid" || !files.TryGetValue(uri.AbsolutePath, out var mime))
         {
@@ -109,7 +110,15 @@ internal sealed class TerminalPane : WorkspacePane
             var root = json.RootElement;
             switch (root.GetProperty("kind").GetString())
             {
-                case "ready": ready.TrySetResult(SizeFrom(root)); break;
+                case "ready":
+                    Core.PostWebMessageAsJson(JsonSerializer.Serialize(new
+                    {
+                        kind = "configure", locale = System.Globalization.CultureInfo.CurrentUICulture.Name,
+                        strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching" }
+                            .ToDictionary(key => key, key => strings[key]),
+                    }));
+                    ready.TrySetResult(SizeFrom(root));
+                    break;
                 case "ack": if (root.GetProperty("id").GetInt64() == sequence) ack?.TrySetResult(); break;
                 case "input" when connection is not null:
                     var text = root.GetProperty("data").GetString()!;
@@ -162,6 +171,13 @@ internal sealed class TerminalPane : WorkspacePane
     }
 
     internal void FocusTerminal() => FocusPane();
+    internal void Find()
+    {
+        if (stopped || controller is null || !IsPage(Core.Source)) return;
+        controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+        Core.PostWebMessageAsJson("{\"kind\":\"find\"}");
+        NotifyActivated();
+    }
     internal override void FocusPane()
     {
         if (stopped || controller is null) return;

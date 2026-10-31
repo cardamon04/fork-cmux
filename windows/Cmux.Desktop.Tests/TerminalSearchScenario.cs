@@ -1,13 +1,16 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Cmux.Desktop;
 
 internal static class TerminalSearchScenario
 {
-    internal static async Task Run(DesktopWindow window, List<string> passed, string? artifacts = null)
+    internal static async Task Run(DesktopWindow window, MemoryClipboard clipboard, List<string> passed, string? artifacts = null)
     {
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         void Pass(string name) { passed.Add(name); Console.WriteLine("passed: " + name); }
         var first = (TerminalPane)window.Current!.Active!;
+        using var firstProcess = Process.GetProcessById(first.ProcessId);
+        _ = firstProcess.SafeHandle;
         // Emit separate words so the echoed command cannot supply the match.
         await Program.Command(first, "Write-Output ('FIND_'+'Alpha'); 1..70 | ForEach-Object { Write-Output ('scroll_'+$_) }; Write-Output ('FIND_'+'Alpha'); Write-Output ('find_'+'alpha')");
         await Program.Contains(first, "scroll_70");
@@ -22,9 +25,15 @@ internal static class TerminalSearchScenario
         await Program.Until(async () => await first.Core.ExecuteScriptAsync("JSON.stringify(term.getSelectionPosition())") != start, "Next did not move the selection.");
         await Click(first, "find-previous");
         await Program.Until(async () => await first.Core.ExecuteScriptAsync("JSON.stringify(term.getSelectionPosition())") == start, "Previous did not return to the prior match.");
+        await first.Core.ExecuteScriptAsync("document.getElementById('find-query').focus()");
+        await Key(first, "Enter", 13);
+        await Program.Until(async () => await first.Core.ExecuteScriptAsync("JSON.stringify(term.getSelectionPosition())") != start, "Enter did not move to the next match.");
+        await Key(first, "Enter", 13, shift: true);
+        await Program.Until(async () => await first.Core.ExecuteScriptAsync("JSON.stringify(term.getSelectionPosition())") == start, "Shift+Enter did not return to the previous match.");
         await Click(first, "find-case");
         await Results(first, 2);
         await window.ClickAction("Copy"); // Exercises the real selected-match copy path with a private clipboard.
+        Require(clipboard.Text == "FIND_Alpha", "Copy did not return the selected search match.");
         Pass("terminal-find-scrollback-navigation-and-case");
 
         await Query(first, "absent_needle_4e917");
@@ -35,7 +44,7 @@ internal static class TerminalSearchScenario
         Pass("terminal-find-empty-and-missing-clear-selection");
 
         await Click(first, "find-close");
-        await Program.Command(first, "Write-Output ('検索😀'+'一致'); Write-Output ('literal['+'.*]')");
+        await Program.Command(first, "Write-Output ('検索😀'+'一致'); Write-Output ('literal['+'.*]'); [Console]::WriteLine((' ' * ([Console]::WindowWidth - 4)) + ('WRAP_'+'NEEDLE'))");
         await Program.Contains(first, "検索😀一致");
         await window.ClickAction("Find");
         await Query(first, "検索😀一致");
@@ -44,6 +53,9 @@ internal static class TerminalSearchScenario
         await Query(first, "literal[.*]");
         await Results(first, 1);
         Require(await first.Core.ExecuteScriptAsync("window.cmux.selection()") == "\"literal[.*]\"", "Literal search treated regex punctuation as a pattern.");
+        await Query(first, "WRAP_NEEDLE");
+        await Results(first, 1);
+        Require(await first.Core.ExecuteScriptAsync("window.cmux.selection().replaceAll('\\n','')") == "\"WRAP_NEEDLE\"", "Search did not select a match across a soft wrap.");
         // Query text stays in the find input; even command-like text never reaches PowerShell.
         await Query(first, "Write-Output ('SEARCH_INPUT_'+'LEAK')");
         await Results(first, 0);
@@ -52,9 +64,17 @@ internal static class TerminalSearchScenario
 
         await Query(first, "FIND_Alpha");
         await Results(first, 2);
+        await Program.Command(first, "Write-Output ('FIND_'+'Alpha')");
+        await Results(first, 3);
+        Pass("terminal-find-updates-after-new-output");
+
+        await Query(first, "FIND_Alpha");
+        await Results(first, 3);
         var firstWorkspace = window.Current!;
         await window.ClickAction("NewWorkspace");
         var other = (TerminalPane)window.Current!.Active!;
+        using var otherProcess = Process.GetProcessById(other.ProcessId);
+        _ = otherProcess.SafeHandle;
         await Program.Command(other, "Write-Output ('OTHER_'+'FIND')");
         await Program.Contains(other, "OTHER_FIND");
         await window.ClickAction("Find");
@@ -62,7 +82,7 @@ internal static class TerminalSearchScenario
         await Results(other, 0);
         window.SelectWorkspace(Array.IndexOf(window.Workspaces.ToArray(), firstWorkspace));
         Require(await first.Core.ExecuteScriptAsync("document.getElementById('find-query').value") == "\"FIND_Alpha\"", "Workspace switching lost the pane's search text.");
-        await Results(first, 2);
+        await Results(first, 3);
         await window.ClickAction("OpenBrowser");
         Require(!window.IsActionEnabled("Find"), "Terminal find was enabled for a browser pane.");
         await window.ClickAction("ClosePane");
@@ -90,10 +110,24 @@ internal static class TerminalSearchScenario
         await window.ClickAction("Find");
         await Query(first, "pending_close");
         await window.ClickAction("CloseWorkspace");
+        Require(firstProcess.WaitForExit(0), "The searched workspace's original shell survived close.");
         Require(window.Current?.Active == other, "Closing a searched workspace selected the wrong surviving pane.");
         await Program.Command(other, "Write-Output ('SEARCH_CLOSE_'+'SURVIVOR')");
         await Program.Contains(other, "SEARCH_CLOSE_SURVIVOR");
         Pass("terminal-find-dismiss-and-close-preserve-input");
+
+        await Click(other, "find-close");
+        await Program.Command(other, "1..1100 | ForEach-Object { Write-Output ('FIND_LIMIT_'+'MARK') }; Write-Output ('LIMIT_'+'DONE')");
+        await Program.Contains(other, "LIMIT_DONE");
+        await window.ClickAction("Find");
+        await Query(other, "FIND_LIMIT_MARK");
+        await Program.Until(async () => await other.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent === '≥ '+new Intl.NumberFormat(document.documentElement.lang).format(1000)") == "true", "The capped count was presented as an exact total.");
+        await Click(other, "find-next");
+        Require(await other.Core.ExecuteScriptAsync("window.cmux.selection()") == "\"FIND_LIMIT_MARK\"", "Search stopped navigating when highlights reached their cap.");
+        await Click(other, "find-close");
+        await window.ClickAction("CloseWorkspace");
+        Require(otherProcess.WaitForExit(0), "The highlight-cap fixture's original shell survived close.");
+        Pass("terminal-find-highlight-cap-remains-navigable");
     }
 
     private static async Task Query(TerminalPane pane, string text)
@@ -103,13 +137,18 @@ internal static class TerminalSearchScenario
         if (text.Length == 0) await Key(pane, "Backspace", 8);
     }
 
-    private static Task Click(TerminalPane pane, string id) => pane.Core.ExecuteScriptAsync("document.getElementById(" + JsonSerializer.Serialize(id) + ").click()");
+    private static async Task Click(TerminalPane pane, string id)
+    {
+        using var bounds = JsonDocument.Parse(await pane.Core.ExecuteScriptAsync("(()=>{const r=document.getElementById(" + JsonSerializer.Serialize(id) + ").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()"));
+        foreach (var type in new[] { "mousePressed", "mouseReleased" })
+            await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent", JsonSerializer.Serialize(new { type, x = bounds.RootElement.GetProperty("x").GetDouble(), y = bounds.RootElement.GetProperty("y").GetDouble(), button = "left", buttons = type == "mousePressed" ? 1 : 0, clickCount = 1 }));
+    }
     private static Task Results(TerminalPane pane, int count) => Program.Until(async () => count == 0
         ? JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent")) == new Strings()["FindMissing"]
         : await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent.endsWith(' / '+new Intl.NumberFormat(document.documentElement.lang).format(" + count + "))") == "true", "Find did not produce " + count + " matches.");
-    private static async Task Key(TerminalPane pane, string key, int code)
+    private static async Task Key(TerminalPane pane, string key, int code, bool shift = false)
     {
         foreach (var type in new[] { "keyDown", "keyUp" })
-            await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key, windowsVirtualKeyCode = code, nativeVirtualKeyCode = code }));
+            await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key, modifiers = shift ? 8 : 0, windowsVirtualKeyCode = code, nativeVirtualKeyCode = code }));
     }
 }

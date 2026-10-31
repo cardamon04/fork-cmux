@@ -10,7 +10,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 縦横分割・ドラッグサイズ変更・選択・終了時の畳み込みを実装。タブ・移動など未実装 |
 | WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYとxterm.jsをアプリへ統合。対話PowerShell/PSReadLine・Unicode・SGR色・サイズ伝播・終了を実操作で検証。IME・全端末互換は未検証 |
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
-| WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | xterm.jsのスクロール・選択とコピー/貼り付けボタンを実装。実マウス選択と注入したクリップボードでコピー/貼り付け経路を検証。OSクリップボード・検索・画像・Ghosttyとの差は未検証/未実装 |
+| WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | スクロール・選択・コピー/貼り付けに加え、ペイン内の文字列検索・前後移動・大文字小文字切替を実装。実PowerShell出力・スクロールバック・Unicode・折り返し・該当なし・選択コピー・ワークスペース分離・終了・上限を検証。正規表現・全ペイン検索・検索キー設定・OSクリップボード・画像・Ghosttyとの差は未検証/未実装 |
 | WIN-006 | F-03 | CWD、Git、PR、待受ポート、最新通知の表示 | [README](../README.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 未実装 |
 | WIN-007 | F-04 | 通知の受信、未読、ペイン強調、一覧、移動 | [TerminalNotificationStore](../Sources/TerminalNotificationStore.swift)、[CmuxNotifications](../Packages/macOS/CmuxNotifications/) | 未実装 |
 | WIN-008 | F-04 | Windowsのデスクトップ通知 | [CmuxNotifications](../Packages/macOS/CmuxNotifications/) | OS向け実装と通知からの復帰を要検証 |

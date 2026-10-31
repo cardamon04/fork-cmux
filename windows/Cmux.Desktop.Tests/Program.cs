@@ -57,7 +57,7 @@ internal static class Program
                 pids.Add(first.ProcessId);
                 if (searchOnly)
                 {
-                    await TerminalSearchScenario.Run(window, passed, args.Length > 1 ? args[1] : null);
+                    await TerminalSearchScenario.Run(window, clipboard, passed, args.Length > 1 ? args[1] : null);
                     Require(uiErrors.Count == 0 && window.LastError is null, "Search reported a native UI error.");
                     await window.Shutdown().WaitAsync(Deadline);
                     Require(!Directory.Exists(profile), "Search fixture profile was not removed.");
@@ -256,7 +256,7 @@ internal static class Program
                     await first.Core.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, image);
                 }
                 await window.ClickAction("NewWorkspace");
-                await TerminalSearchScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
+                await TerminalSearchScenario.Run(window, clipboard, passed, args.Length > 0 ? args[0] : null);
                 await window.Shutdown().WaitAsync(Deadline);
                 Require(!Directory.Exists(profile), "Application profile was not removed.");
                 Require(window.BrowserProfilePath is { } browserProfile && !Directory.Exists(browserProfile), "Browser profile was not removed.");
