@@ -123,16 +123,33 @@ internal static class WorkingDirectoryScenario
     private static Task ContainsPath(TerminalPane pane, string marker) => Program.Until(async () =>
         (await Program.Text(pane)).Replace("\r", "").Replace("\n", "").Contains(marker), "Missing rendered logical path: " + marker);
 
-    private static async Task ActualDirectory(TerminalPane pane, string expected, string visiblePrefix)
+    private static async Task ActualDirectory(TerminalPane pane, string expected, string? visiblePrefix)
     {
         // The cwd oracle reads the actual provider path as UTF-8 bytes over an
         // ASCII envelope, independently of legacy console glyph width/encoding.
-        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(expected));
-        await Program.Command(pane, "Write-Output ('CWD_UTF8_'+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Location).ProviderPath))); Write-Output ('CWD_OUTPUT_CODEPAGE_'+[Console]::OutputEncoding.CodePage)");
-        try { await ContainsPath(pane, "CWD_UTF8_" + encoded); }
+        var nonce = Guid.NewGuid().ToString("N");
+        var prefix = "CWD_BEGIN_" + nonce + "|";
+        var suffix = "|CWD_END_" + nonce;
+        await Program.Command(pane, "Write-Output ('" + prefix + "'+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Location).ProviderPath))+'" + suffix + "'); Write-Output ('CWD_OUTPUT_CODEPAGE_'+[Console]::OutputEncoding.CodePage)");
+        string? actual = null;
+        try
+        {
+            await Program.Until(async () =>
+            {
+                var text = (await Program.Text(pane)).Replace("\r", "").Replace("\n", "");
+                var start = text.LastIndexOf(prefix, StringComparison.Ordinal);
+                if (start < 0) return false;
+                start += prefix.Length;
+                var end = text.IndexOf(suffix, start, StringComparison.Ordinal);
+                if (end < 0) return false;
+                try { actual = new System.Text.UTF8Encoding(false, true).GetString(Convert.FromBase64String(text[start..end])); return true; }
+                catch (Exception error) when (error is FormatException or System.Text.DecoderFallbackException) { return false; }
+            }, "The shell did not return a complete cwd frame.");
+        }
         catch { Console.Error.WriteLine("cwd-value diagnostic: " + await Program.Text(pane)); throw; }
+        Require(actual == expected, "Actual shell working directory did not match the expected value.");
         var rendered = await Program.Text(pane);
-        if (!rendered.Replace("\r", "").Replace("\n", "").Contains(visiblePrefix + expected))
+        if (visiblePrefix is not null && !rendered.Replace("\r", "").Replace("\n", "").Contains(visiblePrefix + expected))
             Console.WriteLine("coverage-gap: literal Unicode path display differs; UTF-8 cwd value verified. private rendered data: " + rendered);
     }
 
@@ -228,9 +245,9 @@ internal static class WorkingDirectoryScenario
                 {
                     window.Show(); await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
                     var pane = (TerminalPane)window.Current!.Active!;
-                    await ActualDirectory(pane, child, "UNUSED_");
+                    await ActualDirectory(pane, child, null);
                     var rejected = false;
-                    try { await ActualDirectory(pane, parent, "UNUSED_"); }
+                    try { await ActualDirectory(pane, parent, null); }
                     catch (InvalidOperationException error) when (error.Message == "Actual shell working directory did not match the expected value.") { rejected = true; }
                     Require(rejected, "The cwd value oracle accepted a descendant of the expected directory.");
                     Pass("cwd-" + item.Name + "-oracle-rejects-descendant-prefix", passed);
