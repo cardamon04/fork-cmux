@@ -21,6 +21,7 @@ internal static class Program
         }
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
         var pasteOnly = args is ["--paste-limit"];
+        var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         var directory = Directory.CreateTempSubdirectory("cmux-desktop-test-").FullName;
@@ -41,8 +42,19 @@ internal static class Program
             {
                 await window.Started.WaitAsync(Deadline);
                 profile = window.ProfilePath;
-                var first = window.Current!.Active!;
+                var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (browserOnly)
+                {
+                    await window.ClickAction("NewWorkspace");
+                    pids.Add(((TerminalPane)window.Current!.Active!).ProcessId);
+                    await BrowserScenario.Run(window, passed, args.Length > 1 ? args[1] : null);
+                    await window.Shutdown().WaitAsync(Deadline);
+                    Require(!Directory.Exists(profile), "Application profile was not removed.");
+                    Require(window.BrowserProfilePath is { } privateBrowser && !Directory.Exists(privateBrowser), "Browser profile was not removed.");
+                    exitCode = 0;
+                    return;
+                }
                 if (pasteOnly)
                 {
                     await PasteLimit(window, clipboard, pids);
@@ -64,7 +76,7 @@ internal static class Program
                 var oldSize = await Size(first);
                 await window.ClickAction("SplitRight");
                 Require(window.Current.Panes.Count == 2, "Split button did not create a second terminal.");
-                var second = window.Current.Active!;
+                var second = (TerminalPane)window.Current.Active!;
                 pids.Add(second.ProcessId);
                 Require(window.Current.Active == second, "Selection precondition failed.");
                 await Mouse(first, "mousePressed", 80, 80, 1);
@@ -91,7 +103,7 @@ internal static class Program
                 Pass("split-resize-isolation-close", passed);
 
                 await window.ClickAction("SplitBelow");
-                var below = window.Current.Active!;
+                var below = (TerminalPane)window.Current.Active!;
                 pids.Add(below.ProcessId);
                 Require(window.Current.Controls[0] is SplitContainer { Orientation: Orientation.Horizontal }, "Split below used the wrong layout.");
                 await Command(below, "Write-Output ('BELOW_' + 'PANE')");
@@ -100,7 +112,7 @@ internal static class Program
                 Pass("split-below", passed);
 
                 await window.ClickAction("NewWorkspace");
-                var other = window.Current!.Active!;
+                var other = (TerminalPane)window.Current!.Active!;
                 pids.Add(other.ProcessId);
                 clipboard.Text = "Write-Output ('PASTE_' + 'WORKSPACE')\r";
                 await window.ClickAction("Paste");
@@ -125,7 +137,7 @@ internal static class Program
                 Pass("navigation-and-output-boundary", passed);
 
                 await window.ClickAction("NewWorkspace");
-                var noisy = window.Current!.Active!;
+                var noisy = (TerminalPane)window.Current!.Active!;
                 pids.Add(noisy.ProcessId);
                 await Command(noisy, "while ($true) { [Console]::Write('LOAD_') }");
                 await Contains(noisy, "LOAD_LOAD_");
@@ -143,14 +155,14 @@ internal static class Program
                 for (var index = 1; index < 10; index++)
                 {
                     await window.ClickAction("NewWorkspace");
-                    var pane = window.Current!.Active!;
+                    var pane = (TerminalPane)window.Current!.Active!;
                     pids.Add(pane.ProcessId);
                     await Command(pane, $"Write-Output ('LIVE_' + '{index}')");
                     await Contains(pane, $"LIVE_{index}");
                 }
                 Require(window.Workspaces.Count() == 10, "Ten live terminals were not retained.");
                 foreach (var workspace in window.Workspaces)
-                    foreach (var pane in workspace.Panes)
+                    foreach (var pane in workspace.Panes.Cast<TerminalPane>())
                     {
                         using var process = Process.GetProcessById(pane.ProcessId);
                         Require(!process.HasExited, "A workspace shell exited while switching.");
@@ -183,6 +195,7 @@ internal static class Program
 
                 Require(PackagingAndLocales() == 0, "Application localization or distribution notices failed.");
                 Pass("localized-ui-actions", passed);
+                await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 if (args.Length > 0)
                 {
@@ -192,6 +205,7 @@ internal static class Program
                 }
                 await window.Shutdown().WaitAsync(Deadline);
                 Require(!Directory.Exists(profile), "Application profile was not removed.");
+                Require(window.BrowserProfilePath is { } browserProfile && !Directory.Exists(browserProfile), "Browser profile was not removed.");
                 foreach (var pid in pids)
                     try { using var process = Process.GetProcessById(pid); Require(process.HasExited, "Owned shell is still running."); }
                     catch (ArgumentException) { }
@@ -203,7 +217,7 @@ internal static class Program
             {
                 Console.Error.WriteLine(error);
                 Console.Error.WriteLine("product-error: " + window.LastError);
-                if (window.Current?.Active is { } failedPane)
+                if (window.Current?.Active is TerminalPane failedPane)
                     try { Console.Error.WriteLine("rendered: " + (await Text(failedPane))); } catch (Exception capture) { Console.Error.WriteLine(capture.Message); }
             }
             finally
@@ -220,7 +234,7 @@ internal static class Program
     private static async Task PasteLimit(DesktopWindow window, MemoryClipboard clipboard, List<int> pids)
     {
         await window.ClickAction("NewWorkspace");
-        var pane = window.Current!.Active!;
+        var pane = (TerminalPane)window.Current!.Active!;
         pids.Add(pane.ProcessId);
         await Until(async () => (await Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "Paste shell was not ready.");
         await pane.Core.ExecuteScriptAsync("window.pasteLength=0;term.onData(data=>window.pasteLength=data.length);term.write('\\x1b[?2004h');");
@@ -260,7 +274,7 @@ internal static class Program
         {
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ja");
             Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", unused);
-            try { TerminalEnvironment.Create().GetAwaiter().GetResult(); throw new Exception("Profile override was accepted."); }
+            try { WebViewProfile.Create().GetAwaiter().GetResult(); throw new Exception("Profile override was accepted."); }
             catch (InvalidOperationException error)
             {
                 Require(error.Message == new Strings()["ProfileOverride"], "Profile refusal bypassed the Japanese UI catalog: " + error.Message);
@@ -292,7 +306,7 @@ internal static class Program
         return failures.Count == 0 ? 0 : 1;
     }
     private static void Pass(string name, List<string> passed) { passed.Add(name); Console.WriteLine("passed: " + name); }
-    private static async Task<string> Text(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.text()"))!;
+    internal static async Task<string> Text(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.text()"))!;
     private static Task Mouse(TerminalPane pane, string type, double x, double y, int buttons) =>
         pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent", JsonSerializer.Serialize(new { type, x, y, button = "left", buttons, clickCount = 1 }));
     private static async Task SelectText(TerminalPane pane, string marker)
@@ -315,14 +329,14 @@ internal static class Program
         using var json = JsonDocument.Parse(await pane.Core.ExecuteScriptAsync("window.cmux.size()"));
         return (json.RootElement.GetProperty("cols").GetInt32(), json.RootElement.GetProperty("rows").GetInt32());
     }
-    private static Task Contains(TerminalPane pane, string marker) => Until(async () => (await Text(pane)).Contains(marker), "Missing rendered output: " + marker);
-    private static async Task Until(Func<Task<bool>> check, string failure, CancellationToken cancellationToken = default)
+    internal static Task Contains(TerminalPane pane, string marker) => Until(async () => (await Text(pane)).Contains(marker), "Missing rendered output: " + marker);
+    internal static async Task Until(Func<Task<bool>> check, string failure, CancellationToken cancellationToken = default)
     {
         var watch = Stopwatch.StartNew();
         while (watch.Elapsed < Deadline) { cancellationToken.ThrowIfCancellationRequested(); if (await check()) return; await Task.Delay(50, cancellationToken); }
         throw new TimeoutException(failure);
     }
-    private static async Task Command(TerminalPane pane, string text)
+    internal static async Task Command(TerminalPane pane, string text)
     {
         await Until(async () => (await Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "PowerShell did not finish startup or return to its prompt.");
         pane.FocusTerminal();

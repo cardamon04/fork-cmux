@@ -10,7 +10,8 @@ internal sealed class DesktopWindow : Form
     private readonly Panel content = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel status = new();
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private TerminalEnvironment? environment;
+    private WebViewProfile? environment;
+    private WebViewProfile? browserEnvironment;
     private Task? initialize;
     private bool shuttingDown;
     private bool shutdownComplete;
@@ -19,6 +20,7 @@ internal sealed class DesktopWindow : Form
     internal WorkspaceView? Current => sidebar.SelectedItem as WorkspaceView;
     internal IEnumerable<WorkspaceView> Workspaces => sidebar.Items.Cast<WorkspaceView>();
     internal string ProfilePath => environment!.Profile;
+    internal string? BrowserProfilePath => browserEnvironment?.Profile;
     internal string? LastError { get; private set; }
     internal Task PendingAction { get; private set; } = Task.CompletedTask;
 
@@ -38,6 +40,7 @@ internal sealed class DesktopWindow : Form
         AddAction("NewWorkspace", NewWorkspace);
         AddAction("SplitRight", () => Split(Orientation.Vertical));
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
+        AddAction("OpenBrowser", OpenBrowser);
         AddAction("ClosePane", ClosePane);
         AddAction("CloseWorkspace", CloseWorkspace);
         toolbar.Items.Add(new ToolStripSeparator());
@@ -67,6 +70,15 @@ internal sealed class DesktopWindow : Form
         return PendingAction;
     }
 
+    internal bool IsActionEnabled(string key) => toolbar.Enabled && toolbar.Items[key]!.Enabled;
+
+    private void UpdateActions()
+    {
+        var allowed = Current?.Active?.SupportsClipboard == true;
+        toolbar.Items["Copy"]!.Enabled = allowed;
+        toolbar.Items["Paste"]!.Enabled = allowed;
+    }
+
     private async Task Run(Func<Task> action)
     {
         if (shuttingDown || environment is null) return;
@@ -81,7 +93,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Enabled = false;
         try
         {
-            environment = await TerminalEnvironment.Create(strings);
+            environment = await WebViewProfile.Create(strings);
             await NewWorkspace();
             status.Text = strings["Ready"];
             started.TrySetResult();
@@ -96,15 +108,22 @@ internal sealed class DesktopWindow : Form
         status.Text = strings.Format("Error", message);
     }
 
-    internal async Task NewWorkspace()
+    internal Task NewWorkspace() => NewWorkspace(PaneKind.Terminal);
+
+    private async Task NewWorkspace(PaneKind kind)
     {
         var workspace = new WorkspaceView(strings.Format("Workspace", ++workspaceSequence)) { Dock = DockStyle.Fill };
         content.Controls.Add(workspace);
         sidebar.Items.Add(workspace);
         sidebar.SelectedItem = workspace;
-        var pane = AddPane(workspace);
+        var pane = AddPane(workspace, kind);
         workspace.Controls.Add(pane);
-        try { await pane.Start(environment!, launch); pane.FocusTerminal(); }
+        try
+        {
+            await StartPane(pane);
+            ActivatePane(workspace, pane);
+            if (Current == workspace) pane.FocusPane();
+        }
         catch
         {
             await RemoveWorkspace(workspace);
@@ -112,52 +131,73 @@ internal sealed class DesktopWindow : Form
         }
     }
 
-    private TerminalPane AddPane(WorkspaceView workspace)
+    private async Task StartPane(WorkspacePane pane)
     {
-        var pane = new TerminalPane(strings, clipboard);
-        pane.Activated += active =>
-        {
-            workspace.Active = active;
-            foreach (var item in workspace.Panes)
-            {
-                item.BackColor = item == active ? Color.CornflowerBlue : Color.FromArgb(24, 26, 31);
-            }
-        };
+        var profile = pane.Kind == PaneKind.Browser
+            ? browserEnvironment ??= await WebViewProfile.Create(strings, "cmux-browsing-")
+            : environment!;
+        await pane.Start(profile);
+    }
+
+    private WorkspacePane AddPane(WorkspaceView workspace, PaneKind kind)
+    {
+        WorkspacePane pane = kind == PaneKind.Browser
+            ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, launch);
+        pane.Activated += active => ActivatePane(workspace, active);
         pane.Failed += ShowError;
         workspace.Panes.Add(pane);
-        workspace.Active = pane;
+        ActivatePane(workspace, pane);
         return pane;
+    }
+
+    private void ActivatePane(WorkspaceView workspace, WorkspacePane pane)
+    {
+        if (!workspace.Panes.Contains(pane)) return;
+        workspace.Active = pane;
+        foreach (var item in workspace.Panes)
+            item.BackColor = item == pane ? Color.CornflowerBlue : Color.FromArgb(24, 26, 31);
+        UpdateActions();
     }
 
     private void SelectWorkspace()
     {
         foreach (var workspace in Workspaces) workspace.Visible = workspace == Current;
         Current?.BringToFront();
-        Current?.Active?.FocusTerminal();
+        Current?.Active?.FocusPane();
+        UpdateActions();
     }
 
     internal void SelectWorkspace(int index) => sidebar.SelectedIndex = index;
 
-    internal async Task Split(Orientation orientation)
+    internal Task Split(Orientation orientation) => Split(orientation, PaneKind.Terminal);
+
+    internal Task OpenBrowser() => Current is null ? NewWorkspace(PaneKind.Browser) : Split(Orientation.Vertical, PaneKind.Browser);
+
+    private async Task Split(Orientation orientation, PaneKind kind)
     {
         if (Current is not { Active: { } previous } workspace) return;
         var parent = previous.Parent!;
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = orientation, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
-        var pane = AddPane(workspace);
+        var pane = AddPane(workspace, kind);
         parent.Controls.Remove(previous);
         parent.Controls.Add(split);
         split.Panel1.Controls.Add(previous);
         split.Panel2.Controls.Add(pane);
         var available = orientation == Orientation.Vertical ? split.Width : split.Height;
         split.SplitterDistance = Math.Clamp(available / 2, 0, Math.Max(0, available - split.SplitterWidth));
-        try { await pane.Start(environment!, launch); pane.FocusTerminal(); }
+        try
+        {
+            await StartPane(pane);
+            ActivatePane(workspace, pane);
+            if (Current == workspace) pane.FocusPane();
+        }
         catch
         {
             split.Panel1.Controls.Remove(previous);
             parent.Controls.Remove(split);
             parent.Controls.Add(previous);
             workspace.Panes.Remove(pane);
-            workspace.Active = previous;
+            ActivatePane(workspace, previous);
             await pane.DisposeAsync();
             split.Dispose();
             throw;
@@ -176,10 +216,11 @@ internal sealed class DesktopWindow : Form
         parent.Controls.Remove(split);
         parent.Controls.Add(sibling);
         workspace.Panes.Remove(pane);
-        workspace.Active = workspace.Panes[0];
+        ActivatePane(workspace, workspace.Panes[0]);
         await pane.DisposeAsync();
         split.Dispose();
-        workspace.Active.FocusTerminal();
+        workspace.Active.FocusPane();
+        UpdateActions();
     }
 
     internal async Task CloseWorkspace()
@@ -199,6 +240,7 @@ internal sealed class DesktopWindow : Form
         sidebar.Items.Remove(workspace);
         workspace.Dispose();
         if (sidebar.Items.Count > 0) sidebar.SelectedIndex = Math.Min(index, sidebar.Items.Count - 1);
+        UpdateActions();
         if (failure is not null) throw failure;
     }
 
@@ -214,6 +256,8 @@ internal sealed class DesktopWindow : Form
             try { await RemoveWorkspace(workspace); } catch (Exception error) { failure ??= error; }
         if (environment is not null)
             try { await environment.DisposeAsync(); } catch (Exception error) { failure ??= error; }
+        if (browserEnvironment is not null)
+            try { await browserEnvironment.DisposeAsync(); } catch (Exception error) { failure ??= error; }
         shutdownComplete = true;
         if (failure is not null) throw failure;
     }

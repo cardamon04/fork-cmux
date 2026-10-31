@@ -2,14 +2,14 @@ using Microsoft.Web.WebView2.Core;
 
 namespace Cmux.Desktop;
 
-internal sealed class TerminalEnvironment : IAsyncDisposable
+internal sealed class WebViewProfile : IAsyncDisposable
 {
     private readonly string profile;
     private TaskCompletionSource browserExit = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private uint browserProcessId;
     internal CoreWebView2Environment Core { get; }
     internal string Profile => profile;
-    private TerminalEnvironment(string profile, CoreWebView2Environment core)
+    private WebViewProfile(string profile, CoreWebView2Environment core)
     {
         this.profile = profile;
         Core = core;
@@ -31,12 +31,12 @@ internal sealed class TerminalEnvironment : IAsyncDisposable
         return controller;
     }
 
-    internal static async Task<TerminalEnvironment> Create(Strings? strings = null)
+    internal static async Task<WebViewProfile> Create(Strings? strings = null, string prefix = "cmux-desktop-")
     {
         strings ??= new Strings();
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER")))
             throw new InvalidOperationException(strings["ProfileOverride"]);
-        var profile = Directory.CreateTempSubdirectory("cmux-desktop-").FullName;
+        var profile = Directory.CreateTempSubdirectory(prefix).FullName;
         try
         {
             var core = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);

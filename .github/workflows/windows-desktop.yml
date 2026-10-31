@@ -38,12 +38,12 @@ jobs:
         run: dotnet restore windows/Cmux.Desktop.Tests --locked-mode
       - name: Build application and integration tests
         run: dotnet build windows/Cmux.Desktop.Tests --no-restore --nologo -warnaserror
-      - name: Exercise visible desktop, real PowerShell and workspace controls
+      - name: Exercise terminal and browser panes with real workspace controls
         shell: pwsh
         run: |
           & windows/Cmux.Desktop.Tests/bin/Debug/net10.0-windows/Cmux.Desktop.Tests.exe desktop-results
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload terminal rendering evidence
+      - name: Upload owned desktop and renderer evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
