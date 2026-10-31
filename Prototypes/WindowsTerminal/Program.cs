@@ -80,7 +80,7 @@ Console.WriteLine(JsonSerializer.Serialize(new
     os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
     architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
     runtime = Environment.Version.ToString(),
-    powershell = args.Length > 1 ? "tested" : "not-run",
+    powershell = tests.Any(test => test.Name == "powershell-utf8-and-exit") ? "tested" : "not-run",
     outcomes,
 }, new JsonSerializerOptions { WriteIndented = true }));
 return failed ? 1 : 0;
@@ -244,11 +244,14 @@ static async Task PowerShell(string executable)
     // A profile-free read/eval loop verifies console input and PowerShell parsing
     // without loading the user's PSReadLine configuration. -Command - requires
     // redirected stdin and cannot be used with a real ConPTY console.
-    var command = "[Console]::WriteLine('@@POWERSHELL-READY@@'); while($null -ne ($line = [Console]::ReadLine())) { Invoke-Expression $line }";
+    var command = "[Console]::InputEncoding = [Text.UTF8Encoding]::new($false); [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "
+        + "[Console]::WriteLine('@@POWERSHELL-READY@@'); while($null -ne ($line = [Console]::ReadLine())) { Invoke-Expression $line }";
     using var session = ConPtySession.Start(executable, ["-NoLogo", "-NoProfile", "-Command", command],
         Directory.GetCurrentDirectory(), 120, 30, output.Append);
     await output.WaitFor("@@POWERSHELL-READY@@");
-    session.Write("[Console]::WriteLine('@@POWERSHELL:日本語🙂@@'); exit 13\r");
+    // Build the response from pieces: the expected contiguous marker must not
+    // appear in the command echoed by the console before PowerShell evaluates it.
+    session.Write("$text = '日本語🙂'; [Console]::WriteLine('@@POWERSHELL:' + $text + '@@'); exit 13\r");
     await output.WaitFor("@@POWERSHELL:日本語🙂@@");
     if (session.WaitForExit(TimeSpan.FromSeconds(10)) != 13) throw new Exception("PowerShell exit code was lost.");
 }

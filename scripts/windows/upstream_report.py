@@ -93,7 +93,7 @@ def build_report(repo: Path, baseline: dict, target_ref: str) -> dict:
         changes.append({"status": status, "path": path, "feature_hints": feature_hints(path), "review": "required"})
     # Read one record per commit with NUL-delimited subjects, preserving Unicode
     # and avoiding Git's path quoting conventions on Windows.
-    history = git(repo, "log", "--reverse", "--format=%H%x00%s", "-z", f"{base}..{target}", "--").split(b"\0")
+    history = git(repo, "log", "--encoding=UTF-8", "--reverse", "--format=%H%x00%s", "-z", f"{base}..{target}", "--").split(b"\0")
     commits = []
     for index in range(0, len(history) - 1, 2):
         commits.append({"commit": history[index].decode("ascii"), "subject": history[index + 1].decode("utf-8", errors="replace")})

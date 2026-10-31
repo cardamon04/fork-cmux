@@ -193,6 +193,17 @@ internal sealed class ConPtySession : IDisposable
                 NativeMethods.ClosePseudoConsole(console);
                 console = 0;
             }
+            // Since Windows 11 24H2, ClosePseudoConsole returns immediately.
+            // Output EOF alone does not prove that the client released its
+            // executable and working directory; wait on our own process handle.
+            if (process is not null && !process.IsInvalid)
+            {
+                var result = NativeMethods.WaitForSingleObject(process, 10000);
+                if (result == NativeMethods.WaitTimeout)
+                    throw new TimeoutException("The ConPTY client did not exit during shutdown.");
+                if (result != NativeMethods.WaitObject0)
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
             if (reader is not null && !reader.Wait(TimeSpan.FromSeconds(10)))
                 throw new TimeoutException("ConPTY output did not reach EOF during shutdown.");
         }
