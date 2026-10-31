@@ -27,6 +27,7 @@ internal static class Program
         }
         var pasteOnly = args is ["--paste-limit"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
+        var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var browserOnly = args.Length > 0 && args[0] == "--browser-only";
         var browserFailures = args is ["--browser-failures"];
         var sessionOnly = args.Length > 0 && args[0] == "--session-only";
@@ -55,6 +56,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 pids.Add(first.ProcessId);
+                if (searchClipboard)
+                {
+                    await TerminalSearchScenario.RunClipboard(window, clipboard, passed, args.Length > 1 ? args[1] : null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Search clipboard reported a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (searchOnly)
                 {
                     await TerminalSearchScenario.Run(window, clipboard, passed, args.Length > 1 ? args[1] : null);

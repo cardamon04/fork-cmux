@@ -9,6 +9,7 @@ internal static class TerminalSearchScenario
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         void Pass(string name) { passed.Add(name); Console.WriteLine("passed: " + name); }
         var first = (TerminalPane)window.Current!.Active!;
+        await RunClipboard(window, clipboard, passed);
         using var firstProcess = Process.GetProcessById(first.ProcessId);
         _ = firstProcess.SafeHandle;
         // Emit separate words so the echoed command cannot supply the match.
@@ -128,6 +129,44 @@ internal static class TerminalSearchScenario
         await window.ClickAction("CloseWorkspace");
         Require(otherProcess.WaitForExit(0), "The highlight-cap fixture's original shell survived close.");
         Pass("terminal-find-highlight-cap-remains-navigable");
+    }
+
+    internal static async Task RunClipboard(DesktopWindow window, MemoryClipboard clipboard, List<string> passed, string? only = null)
+    {
+        static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+        var pane = (TerminalPane)window.Current!.Active!;
+        await Program.Command(pane, "Write-Output ('CLIPBOARD_'+'READY')");
+        await Program.Contains(pane, "CLIPBOARD_READY");
+        await window.ClickAction("Find");
+        if (only is null or "paste")
+        {
+            await Query(pane, "");
+            clipboard.Text = "Write-Output ('PASTE_FIND_'+'EXECUTED')\r";
+            await window.ClickAction("Paste");
+            await Program.Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').value"))!.Length > 0
+                || (await Program.Text(pane)).Contains("PASTE_FIND_"), "Paste reached neither find input nor shell.");
+            Require(!(await Program.Text(pane)).Contains("PASTE_FIND_"), "Toolbar Paste sent search clipboard text to PowerShell.");
+            Require(JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').value")) == clipboard.Text.Replace("\r", ""), "Toolbar Paste did not insert into the search input.");
+            await Query(pane, "12345");
+            await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').setSelectionRange(1,3)");
+            clipboard.Text = new string('a', 400);
+            await window.ClickAction("Paste");
+            await Program.Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').value")) == "1" + new string('a', 253) + "45", "Search paste did not preserve selection replacement and the 256-unit limit.");
+            passed.Add("terminal-find-toolbar-paste-stays-in-search");
+            Console.WriteLine("passed: " + passed[^1]);
+        }
+        if (only is null or "copy")
+        {
+            await Query(pane, "COPY_QUERY_PATTERN");
+            await Results(pane, 0);
+            await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').setSelectionRange(5,10)");
+            clipboard.Text = "previous private clipboard";
+            await window.ClickAction("Copy");
+            Require(clipboard.Text == "QUERY", "Toolbar Copy ignored the selected search input text.");
+            passed.Add("terminal-find-toolbar-copies-search-input-selection");
+            Console.WriteLine("passed: " + passed[^1]);
+        }
+        await Click(pane, "find-close");
     }
 
     private static async Task Query(TerminalPane pane, string text)
