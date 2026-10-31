@@ -124,7 +124,19 @@ internal sealed class DesktopWindow : Form
             UpdateActions();
             started.TrySetResult();
         }
-        catch (Exception error) { ShowError(error.Message); started.TrySetException(error); }
+        catch (Exception error)
+        {
+            // An opened store is not a restored session. Startup failures must
+            // never checkpoint a partially created or empty replacement.
+            if (session is not null)
+            {
+                session.ProtectExisting();
+                sessionStatus.Text = strings["SessionUnavailable"];
+            }
+            UpdateActions();
+            ShowError(error.Message);
+            started.TrySetException(error);
+        }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = sidebar.Enabled = true; }
     }
 
@@ -163,7 +175,7 @@ internal sealed class DesktopWindow : Form
             foreach (var pane in workspace.Panes)
             {
                 await StartPane(pane);
-                if (pane is BrowserPane browser) browser.NavigateFromAddress(addresses[browser]);
+                if (pane is BrowserPane browser) browser.RestoreAddress(addresses[browser]);
             }
             workspace.Visible = false;
         }

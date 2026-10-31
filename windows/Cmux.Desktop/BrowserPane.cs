@@ -216,6 +216,13 @@ internal sealed class BrowserPane : WorkspacePane
         || Uri.TryCreate(text, UriKind.Absolute, out var uri) && (IsHttp(uri) || uri.Scheme is "data" or "blob");
 
     internal void NavigateFromAddress(string text) { address.Text = text; ClickNavigation("Go"); }
+    internal void RestoreAddress(string text)
+    {
+        // Retain the saved target while a new document has yet to commit.
+        // A later SourceChanged replaces it with the actual navigated address.
+        SessionAddress = text;
+        NavigateFromAddress(text);
+    }
     internal void ClickNavigation(string key) => ((ToolStripButton)navigation.Items[key]!).PerformClick();
     internal bool IsNavigationEnabled(string key) => navigation.Enabled && navigation.Items[key]!.Enabled;
     internal override void FocusPane()
