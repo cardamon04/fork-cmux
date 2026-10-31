@@ -1,3 +1,5 @@
+> **Windows版の計画 / Windows port planning:** [要求・要件と引き継ぎ（日本語）](docs/windows-port.md)
+
 <h1 align="center">cmux</h1>
 <p align="center">A Ghostty-based macOS terminal with vertical tabs and notifications for AI coding agents</p>
 
