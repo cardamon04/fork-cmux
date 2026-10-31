@@ -17,6 +17,7 @@ internal sealed class TerminalPane : WorkspacePane
     private readonly Strings strings;
     private readonly IClipboard clipboard;
     private readonly ShellLaunch launch;
+    internal string LaunchDirectory => launch.Directory;
     private CoreWebView2Controller? controller;
     private TerminalConnection? connection;
     private Task? pump;

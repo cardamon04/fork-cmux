@@ -5,10 +5,12 @@ internal sealed class DesktopWindow : Form
     private readonly Strings strings = new();
     private readonly ShellLaunch launch;
     private readonly IClipboard clipboard;
+    private readonly SessionStore? session;
     private readonly ToolStrip toolbar = new() { GripStyle = ToolStripGripStyle.Hidden };
     private readonly ListBox sidebar = new() { Dock = DockStyle.Left, Width = 180, IntegralHeight = false };
     private readonly Panel content = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel status = new();
+    private readonly ToolStripStatusLabel sessionStatus = new() { AutoToolTip = true };
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private WebViewProfile? environment;
     private WebViewProfile? browserEnvironment;
@@ -16,6 +18,7 @@ internal sealed class DesktopWindow : Form
     private bool shuttingDown;
     private bool shutdownComplete;
     private bool selectingWorkspace;
+    private bool closingWindow;
     private int workspaceSequence;
     internal Task Started => started.Task;
     internal WorkspaceView? Current => sidebar.SelectedItem as WorkspaceView;
@@ -23,12 +26,14 @@ internal sealed class DesktopWindow : Form
     internal string ProfilePath => environment!.Profile;
     internal string? BrowserProfilePath => browserEnvironment?.Profile;
     internal string? LastError { get; private set; }
+    internal string SessionStatus => sessionStatus.Text ?? "";
     internal Task PendingAction { get; private set; } = Task.CompletedTask;
 
-    internal DesktopWindow(ShellLaunch launch, IClipboard? clipboard = null)
+    internal DesktopWindow(ShellLaunch launch, IClipboard? clipboard = null, SessionStore? session = null)
     {
         this.launch = launch;
         this.clipboard = clipboard ?? new SystemClipboard();
+        this.session = session;
         Text = strings["AppTitle"];
         ClientSize = new(1180, 760);
         MinimumSize = new(640, 400);
@@ -44,11 +49,13 @@ internal sealed class DesktopWindow : Form
         AddAction("OpenBrowser", OpenBrowser);
         AddAction("ClosePane", ClosePane);
         AddAction("CloseWorkspace", CloseWorkspace);
+        AddAction("SaveSession", SaveSession);
         toolbar.Items.Add(new ToolStripSeparator());
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
-        var footer = new StatusStrip();
+        var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
+        footer.Items.Add(sessionStatus);
         Controls.Add(content);
         Controls.Add(sidebar);
         Controls.Add(toolbar);
@@ -78,15 +85,16 @@ internal sealed class DesktopWindow : Form
         var allowed = Current?.Active?.SupportsClipboard == true;
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
+        toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
     }
 
     private async Task Run(Func<Task> action)
     {
-        if (shuttingDown || environment is null) return;
+        if (shuttingDown || closingWindow || environment is null) return;
         toolbar.Enabled = false;
         try { await action(); status.Text = strings["Ready"]; }
         catch (Exception error) { ShowError(error.Message); }
-        finally { if (!shuttingDown) toolbar.Enabled = true; }
+        finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
     }
 
     private async Task Initialize()
@@ -94,13 +102,76 @@ internal sealed class DesktopWindow : Form
         toolbar.Enabled = false;
         try
         {
+            SessionSnapshot? saved = null;
+            if (session is not null)
+                try { saved = await Task.Run(session.Open); }
+                catch (Exception) { sessionStatus.Text = strings["SessionUnavailable"]; }
             environment = await WebViewProfile.Create(strings);
-            await NewWorkspace();
+            if (saved is not null)
+            {
+                try { await RestoreSession(saved); }
+                catch (Exception)
+                {
+                    session!.ProtectExisting();
+                    sessionStatus.Text = strings["SessionUnavailable"];
+                    foreach (var workspace in Workspaces.ToArray()) await RemoveWorkspace(workspace);
+                    await NewWorkspace();
+                }
+            }
+            else await NewWorkspace();
             status.Text = strings["Ready"];
+            UpdateActions();
             started.TrySetResult();
         }
         catch (Exception error) { ShowError(error.Message); started.TrySetException(error); }
-        finally { if (!shuttingDown) toolbar.Enabled = true; }
+        finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
+    }
+
+    private async Task RestoreSession(SessionSnapshot saved)
+    {
+        workspaceSequence = saved.WorkspaceSequence;
+        var addresses = new Dictionary<BrowserPane, string>();
+        var missingDirectory = false;
+        foreach (var item in saved.Workspaces)
+        {
+            var workspace = new WorkspaceView(item.Title) { Dock = DockStyle.Fill, Visible = false };
+            content.Controls.Add(workspace);
+            sidebar.Items.Add(workspace);
+            var tree = SessionLayout.Restore(item.Layout, workspace, node =>
+            {
+                var paneLaunch = launch;
+                if (node.Kind == "terminal")
+                {
+                    if (SessionStore.IsExistingLocalDirectory(node.Directory!)) paneLaunch = launch with { Directory = node.Directory! };
+                    else missingDirectory = true;
+                }
+                var pane = AddPane(workspace, node.Kind == "terminal" ? PaneKind.Terminal : PaneKind.Browser, paneLaunch);
+                if (pane is BrowserPane browser) addresses.Add(browser, node.Url!);
+                return pane;
+            });
+            workspace.Controls.Add(tree);
+            workspace.Active = workspace.Panes[item.ActivePane];
+        }
+        foreach (var workspace in Workspaces)
+            foreach (var pane in workspace.Panes)
+            {
+                await StartPane(pane);
+                if (pane is BrowserPane browser) browser.NavigateFromAddress(addresses[browser]);
+            }
+        if (saved.Workspaces.Length == 0) await NewWorkspace();
+        else sidebar.SelectedIndex = saved.SelectedWorkspace;
+        sessionStatus.Text = strings[missingDirectory ? "SessionDirectoryFallback" : "SessionRestored"];
+    }
+
+    internal SessionSnapshot CaptureSession() => new(SessionSnapshot.CurrentVersion, workspaceSequence,
+        sidebar.SelectedIndex, Workspaces.Select(SessionLayout.Capture).ToArray());
+
+    private async Task SaveSession()
+    {
+        if (session?.CanSave != true) return;
+        var snapshot = CaptureSession();
+        try { await Task.Run(() => session.Save(snapshot)); sessionStatus.Text = strings["SessionSaved"]; }
+        catch (Exception) { sessionStatus.Text = strings["SessionSaveFailed"]; throw new IOException(strings["SessionSaveFailed"]); }
     }
 
     private void ShowError(string message)
@@ -140,10 +211,10 @@ internal sealed class DesktopWindow : Form
         await pane.Start(profile);
     }
 
-    private WorkspacePane AddPane(WorkspaceView workspace, PaneKind kind)
+    private WorkspacePane AddPane(WorkspaceView workspace, PaneKind kind, ShellLaunch? paneLaunch = null)
     {
         WorkspacePane pane = kind == PaneKind.Browser
-            ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, launch);
+            ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, paneLaunch ?? launch);
         pane.Activated += active =>
         {
             if (!selectingWorkspace && Current == workspace) ActivatePane(workspace, active);
@@ -184,6 +255,7 @@ internal sealed class DesktopWindow : Form
             // the saved selection. They must not replace that model state.
             foreach (var workspace in Workspaces) workspace.Visible = workspace == selected;
             selected?.BringToFront();
+            selected?.ApplyRestoredRatios();
             if (selected == Current) pane?.FocusPane();
         }
         finally { selectingWorkspace = false; }
@@ -284,6 +356,7 @@ internal sealed class DesktopWindow : Form
             try { await environment.DisposeAsync(); } catch (Exception error) { failure ??= error; }
         if (browserEnvironment is not null)
             try { await browserEnvironment.DisposeAsync(); } catch (Exception error) { failure ??= error; }
+        session?.Dispose();
         shutdownComplete = true;
         if (failure is not null) throw failure;
     }
@@ -292,9 +365,35 @@ internal sealed class DesktopWindow : Form
     {
         if (shutdownComplete) return;
         e.Cancel = true;
-        if (shuttingDown) return;
-        try { await Shutdown(); }
-        catch (Exception error) { ShowError(error.Message); }
-        finally { Close(); }
+        if (shuttingDown || closingWindow) return;
+        closingWindow = true;
+        toolbar.Enabled = false;
+        try
+        {
+            if (initialize is not null) await initialize;
+            await PendingAction;
+            while (session?.CanSave == true)
+            {
+                try { await SaveSession(); break; }
+                catch (Exception)
+                {
+                    var choice = MessageBox.Show(this, strings["SessionCloseFailed"], strings["AppTitle"], MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                    if (choice == DialogResult.Cancel) return;
+                    if (choice == DialogResult.No) break;
+                }
+            }
+            await Shutdown();
+        }
+        catch (Exception error)
+        {
+            ShowError(error.Message);
+            if (!shutdownComplete) await Shutdown();
+        }
+        finally
+        {
+            closingWindow = false;
+            if (shutdownComplete) Close();
+            else toolbar.Enabled = true;
+        }
     }
 }

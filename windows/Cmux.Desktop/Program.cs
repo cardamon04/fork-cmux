@@ -6,6 +6,6 @@ internal static class Program
     private static void Main()
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new DesktopWindow(ShellLaunch.Default()));
+        Application.Run(new DesktopWindow(ShellLaunch.Default(), session: new SessionStore(SessionStore.DefaultPath)));
     }
 }

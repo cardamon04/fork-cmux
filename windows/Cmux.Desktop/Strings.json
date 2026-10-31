@@ -30,7 +30,14 @@
     "DownloadBlocked": "Downloads are not supported yet.",
     "PermissionBlocked": "This browser permission is not available yet.",
     "NavigationFailed": "The page could not be loaded.",
-    "BrowserFailed": "The browser stopped. Close this pane and open a browser again."
+    "BrowserFailed": "The browser stopped. Close this pane and open a browser again.",
+    "SaveSession": "Save layout",
+    "SessionSaved": "Layout saved.",
+    "SessionRestored": "Layout restored.",
+    "SessionDirectoryFallback": "A missing startup directory was replaced with the default directory.",
+    "SessionUnavailable": "The saved layout could not be restored. This window will not overwrite it.",
+    "SessionSaveFailed": "The layout could not be saved.",
+    "SessionCloseFailed": "The layout could not be saved. Save again? Choose Yes to retry, No to quit without saving, or Cancel to keep working."
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -63,7 +70,14 @@
     "DownloadBlocked": "ダウンロードにはまだ対応していません。",
     "PermissionBlocked": "このブラウザ権限にはまだ対応していません。",
     "NavigationFailed": "ページを読み込めませんでした。",
-    "BrowserFailed": "ブラウザが停止しました。このペインを閉じて、ブラウザを開き直してください。"
+    "BrowserFailed": "ブラウザが停止しました。このペインを閉じて、ブラウザを開き直してください。",
+    "SaveSession": "作業配置を保存",
+    "SessionSaved": "作業配置を保存しました。",
+    "SessionRestored": "作業配置を復元しました。",
+    "SessionDirectoryFallback": "見つからない起動ディレクトリには既定の場所を使用しました。",
+    "SessionUnavailable": "保存した作業配置を復元できません。このウィンドウでは元の保存ファイルを上書きしません。",
+    "SessionSaveFailed": "作業配置を保存できませんでした。",
+    "SessionCloseFailed": "作業配置を保存できませんでした。もう一度保存しますか？「はい」で再試行、「いいえ」で保存せず終了、「キャンセル」で作業に戻ります。"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -96,7 +110,14 @@
     "DownloadBlocked": "Downloads werden noch nicht unterstützt.",
     "PermissionBlocked": "Diese Browserberechtigung ist noch nicht verfügbar.",
     "NavigationFailed": "Die Seite konnte nicht geladen werden.",
-    "BrowserFailed": "Der Browser wurde beendet. Schließen Sie diesen Bereich und öffnen Sie den Browser erneut."
+    "BrowserFailed": "Der Browser wurde beendet. Schließen Sie diesen Bereich und öffnen Sie den Browser erneut.",
+    "SaveSession": "Layout speichern",
+    "SessionSaved": "Layout gespeichert.",
+    "SessionRestored": "Layout wiederhergestellt.",
+    "SessionDirectoryFallback": "Ein fehlendes Startverzeichnis wurde durch das Standardverzeichnis ersetzt.",
+    "SessionUnavailable": "Das gespeicherte Layout konnte nicht wiederhergestellt werden. Dieses Fenster überschreibt es nicht.",
+    "SessionSaveFailed": "Das Layout konnte nicht gespeichert werden.",
+    "SessionCloseFailed": "Das Layout konnte nicht gespeichert werden. Erneut speichern? Wählen Sie Ja zum Wiederholen, Nein zum Beenden ohne Speichern oder Abbrechen, um weiterzuarbeiten."
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -129,7 +150,14 @@
     "DownloadBlocked": "Les téléchargements ne sont pas encore pris en charge.",
     "PermissionBlocked": "Cette autorisation du navigateur n’est pas encore disponible.",
     "NavigationFailed": "La page n’a pas pu être chargée.",
-    "BrowserFailed": "Le navigateur s’est arrêté. Fermez ce volet et ouvrez à nouveau un navigateur."
+    "BrowserFailed": "Le navigateur s’est arrêté. Fermez ce volet et ouvrez à nouveau un navigateur.",
+    "SaveSession": "Enregistrer la disposition",
+    "SessionSaved": "Disposition enregistrée.",
+    "SessionRestored": "Disposition restaurée.",
+    "SessionDirectoryFallback": "Un dossier de démarrage introuvable a été remplacé par le dossier par défaut.",
+    "SessionUnavailable": "La disposition enregistrée n’a pas pu être restaurée. Cette fenêtre ne la remplacera pas.",
+    "SessionSaveFailed": "La disposition n’a pas pu être enregistrée.",
+    "SessionCloseFailed": "La disposition n’a pas pu être enregistrée. Réessayer ? Choisissez Oui pour réessayer, Non pour quitter sans enregistrer ou Annuler pour continuer à travailler."
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -162,7 +190,14 @@
     "DownloadBlocked": "التنزيلات غير مدعومة بعد.",
     "PermissionBlocked": "إذن المتصفح هذا غير متاح بعد.",
     "NavigationFailed": "تعذر تحميل الصفحة.",
-    "BrowserFailed": "توقف المتصفح. أغلق هذا الجزء وافتح المتصفح من جديد."
+    "BrowserFailed": "توقف المتصفح. أغلق هذا الجزء وافتح المتصفح من جديد.",
+    "SaveSession": "حفظ التخطيط",
+    "SessionSaved": "تم حفظ التخطيط.",
+    "SessionRestored": "تمت استعادة التخطيط.",
+    "SessionDirectoryFallback": "تم استبدال مجلد بدء تشغيل مفقود بالمجلد الافتراضي.",
+    "SessionUnavailable": "تعذرت استعادة التخطيط المحفوظ. لن تستبدله هذه النافذة.",
+    "SessionSaveFailed": "تعذر حفظ التخطيط.",
+    "SessionCloseFailed": "تعذر حفظ التخطيط. هل تريد إعادة المحاولة؟ اختر نعم للمحاولة مجددًا، أو لا للخروج دون حفظ، أو إلغاء الأمر لمتابعة العمل."
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -195,7 +230,14 @@
     "DownloadBlocked": "Aún no se admiten descargas.",
     "PermissionBlocked": "Este permiso del navegador aún no está disponible.",
     "NavigationFailed": "No se pudo cargar la página.",
-    "BrowserFailed": "El navegador se detuvo. Cierra este panel y vuelve a abrir un navegador."
+    "BrowserFailed": "El navegador se detuvo. Cierra este panel y vuelve a abrir un navegador.",
+    "SaveSession": "Guardar distribución",
+    "SessionSaved": "Distribución guardada.",
+    "SessionRestored": "Distribución restaurada.",
+    "SessionDirectoryFallback": "Se ha sustituido un directorio de inicio ausente por el directorio predeterminado.",
+    "SessionUnavailable": "No se ha podido restaurar la distribución guardada. Esta ventana no la sobrescribirá.",
+    "SessionSaveFailed": "No se ha podido guardar la distribución.",
+    "SessionCloseFailed": "No se ha podido guardar la distribución. ¿Volver a intentarlo? Elige Sí para reintentar, No para salir sin guardar o Cancelar para seguir trabajando."
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -228,7 +270,14 @@
     "DownloadBlocked": "尚不支援下載。",
     "PermissionBlocked": "尚未提供此瀏覽器權限。",
     "NavigationFailed": "無法載入頁面。",
-    "BrowserFailed": "瀏覽器已停止。請關閉此窗格並重新開啟瀏覽器。"
+    "BrowserFailed": "瀏覽器已停止。請關閉此窗格並重新開啟瀏覽器。",
+    "SaveSession": "儲存配置",
+    "SessionSaved": "已儲存配置。",
+    "SessionRestored": "已還原配置。",
+    "SessionDirectoryFallback": "找不到的啟動目錄已替換為預設目錄。",
+    "SessionUnavailable": "無法還原已儲存的配置。此視窗不會覆寫原檔。",
+    "SessionSaveFailed": "無法儲存配置。",
+    "SessionCloseFailed": "無法儲存配置。要重試嗎？選擇「是」以重試、「否」以不儲存並結束，或「取消」以繼續工作。"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -261,7 +310,14 @@
     "DownloadBlocked": "尚不支持下载。",
     "PermissionBlocked": "尚未提供此浏览器权限。",
     "NavigationFailed": "无法加载页面。",
-    "BrowserFailed": "浏览器已停止。请关闭此窗格并重新打开浏览器。"
+    "BrowserFailed": "浏览器已停止。请关闭此窗格并重新打开浏览器。",
+    "SaveSession": "保存布局",
+    "SessionSaved": "已保存布局。",
+    "SessionRestored": "已恢复布局。",
+    "SessionDirectoryFallback": "找不到的启动目录已替换为默认目录。",
+    "SessionUnavailable": "无法恢复已保存的布局。此窗口不会覆盖原文件。",
+    "SessionSaveFailed": "无法保存布局。",
+    "SessionCloseFailed": "无法保存布局。要重试吗？选择“是”以重试、“否”以不保存并退出，或“取消”以继续工作。"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -294,6 +350,13 @@
     "DownloadBlocked": "다운로드는 아직 지원되지 않습니다.",
     "PermissionBlocked": "이 브라우저 권한은 아직 사용할 수 없습니다.",
     "NavigationFailed": "페이지를 불러올 수 없습니다.",
-    "BrowserFailed": "브라우저가 중지되었습니다. 이 창을 닫고 브라우저를 다시 여세요."
+    "BrowserFailed": "브라우저가 중지되었습니다. 이 창을 닫고 브라우저를 다시 여세요.",
+    "SaveSession": "배치 저장",
+    "SessionSaved": "배치를 저장했습니다.",
+    "SessionRestored": "배치를 복원했습니다.",
+    "SessionDirectoryFallback": "없는 시작 디렉터리를 기본 디렉터리로 바꿨습니다.",
+    "SessionUnavailable": "저장된 배치를 복원할 수 없습니다. 이 창에서는 기존 파일을 덮어쓰지 않습니다.",
+    "SessionSaveFailed": "배치를 저장할 수 없습니다.",
+    "SessionCloseFailed": "배치를 저장할 수 없습니다. 다시 저장할까요? 예를 선택하면 재시도하고, 아니요를 선택하면 저장하지 않고 종료하며, 취소를 선택하면 작업을 계속합니다."
   }
 }
