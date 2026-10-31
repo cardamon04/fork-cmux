@@ -81,7 +81,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Enabled = false;
         try
         {
-            environment = await TerminalEnvironment.Create();
+            environment = await TerminalEnvironment.Create(strings);
             await NewWorkspace();
             status.Text = strings["Ready"];
             started.TrySetResult();

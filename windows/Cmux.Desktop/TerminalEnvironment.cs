@@ -31,17 +31,18 @@ internal sealed class TerminalEnvironment : IAsyncDisposable
         return controller;
     }
 
-    internal static async Task<TerminalEnvironment> Create()
+    internal static async Task<TerminalEnvironment> Create(Strings? strings = null)
     {
+        strings ??= new Strings();
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER")))
-            throw new InvalidOperationException("WEBVIEW2_USER_DATA_FOLDER overrides are incompatible with isolated application profiles.");
+            throw new InvalidOperationException(strings["ProfileOverride"]);
         var profile = Directory.CreateTempSubdirectory("cmux-desktop-").FullName;
         try
         {
             var core = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             if (!string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(core.UserDataFolder)),
                     Path.TrimEndingDirectorySeparator(profile), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("WebView2 selected an unexpected profile.");
+                throw new InvalidOperationException(strings["ProfileRedirected"]);
             return new(profile, core);
         }
         catch

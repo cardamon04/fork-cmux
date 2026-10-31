@@ -57,6 +57,14 @@ internal static class Program
                 Require(window.Current.Panes.Count == 2, "Split button did not create a second terminal.");
                 var second = window.Current.Active!;
                 pids.Add(second.ProcessId);
+                Require(window.Current.Active == second, "Selection precondition failed.");
+                await Mouse(first, "mousePressed", 80, 80, 1);
+                await Mouse(first, "mouseReleased", 80, 80, 0);
+                await Until(() => Task.FromResult(window.Current.Active == first), "Clicking the inactive pane did not select it.");
+                await SelectText(first, "RED_MARK");
+                await window.ClickAction("Copy");
+                Require(clipboard.Text == "RED_MARK", "Copy did not use the selected pane and its terminal selection.");
+                Pass("mouse-selection-and-copy-action", passed);
                 await Until(async () => (await Size(first)).Cols < oldSize.Cols, "Original terminal did not resize after split.");
                 var size = await Size(first);
                 await Command(first, "Write-Output ('SIZE_' + [Console]::WindowWidth + ':' + [Console]::WindowHeight)");
@@ -112,6 +120,12 @@ internal static class Program
                 pids.Add(noisy.ProcessId);
                 await Command(noisy, "while ($true) { [Console]::Write('LOAD_') }");
                 await Contains(noisy, "LOAD_LOAD_");
+                foreach (var type in new[] { "keyDown", "keyUp" })
+                    await noisy.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key = "c", code = "KeyC", modifiers = 2, windowsVirtualKeyCode = 67, nativeVirtualKeyCode = 67 }));
+                await Until(async () => (await Text(noisy)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "Ctrl+C did not return the running shell to its prompt.");
+                Pass("ctrl-c-interrupts-shell-output", passed);
+                await Command(noisy, "while ($true) { [Console]::Write('CLOSE_') }");
+                await Contains(noisy, "CLOSE_CLOSE_");
                 await window.ClickAction("CloseWorkspace").WaitAsync(Deadline);
                 await Command(first, "Write-Output ('AFTER_' + 'CLOSE')");
                 await Contains(first, "AFTER_CLOSE");
@@ -241,6 +255,23 @@ internal static class Program
     }
     private static void Pass(string name, List<string> passed) { passed.Add(name); Console.WriteLine("passed: " + name); }
     private static async Task<string> Text(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.text()"))!;
+    private static Task Mouse(TerminalPane pane, string type, double x, double y, int buttons) =>
+        pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent", JsonSerializer.Serialize(new { type, x, y, button = "left", buttons, clickCount = 1 }));
+    private static async Task SelectText(TerminalPane pane, string marker)
+    {
+        // Inspect pinned xterm renderer cell geometry; selection itself uses real mouse events.
+        var position = await pane.Core.ExecuteScriptAsync("(()=>{const marker=" + JsonSerializer.Serialize(marker) + ";const b=term.buffer.active;let row=-1;for(let i=b.viewportY;i<b.viewportY+term.rows;i++)if(b.getLine(i)?.translateToString(true)===marker){row=i-b.viewportY;break;}const r=term.element.querySelector('.xterm-screen').getBoundingClientRect(),c=term._core._renderService.dimensions.css.cell;return {row,x:r.x+1,y:r.y+(row+.5)*c.height,end:r.x+marker.length*c.width};})()");
+        using var json = JsonDocument.Parse(position);
+        var p = json.RootElement;
+        Require(p.GetProperty("row").GetInt32() >= 0, "Selection marker is not visible.");
+        var x = p.GetProperty("x").GetDouble();
+        var y = p.GetProperty("y").GetDouble();
+        var end = p.GetProperty("end").GetDouble();
+        await Mouse(pane, "mousePressed", x, y, 1);
+        await Mouse(pane, "mouseMoved", end, y, 1);
+        await Mouse(pane, "mouseReleased", end, y, 0);
+        await Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.selection()")) == marker, "Mouse selection did not select the marker.");
+    }
     private static async Task<(int Cols, int Rows)> Size(TerminalPane pane)
     {
         using var json = JsonDocument.Parse(await pane.Core.ExecuteScriptAsync("window.cmux.size()"));

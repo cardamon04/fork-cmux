@@ -120,11 +120,11 @@ internal sealed class TerminalPane : UserControl, IAsyncDisposable
         catch (Exception error) { if (!stopped) Failed?.Invoke(error.Message); }
     }
 
-    private static (short Cols, short Rows) SizeFrom(JsonElement root)
+    private (short Cols, short Rows) SizeFrom(JsonElement root)
     {
         var cols = root.GetProperty("cols").GetInt32();
         var rows = root.GetProperty("rows").GetInt32();
-        if (cols < 1 || rows < 1 || cols > 1000 || rows > 1000) throw new InvalidOperationException("Invalid terminal size.");
+        if (cols < 1 || rows < 1 || cols > 1000 || rows > 1000) throw new InvalidOperationException(strings["InvalidSize"]);
         return ((short)cols, (short)rows);
     }
 

@@ -9,11 +9,12 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" GeneratePathProperty="true" />
     <ProjectReference Include="../Cmux.Terminal/Cmux.Terminal.csproj" />
     <InternalsVisibleTo Include="Cmux.Desktop.Tests" />
     <EmbeddedResource Include="Strings.json" />
     <Content Include="Assets/**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)/LICENSE.txt" Link="Microsoft.Web.WebView2.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/xterm/lib/xterm.js" Link="Assets/xterm.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/xterm/css/xterm.css" Link="Assets/xterm.css" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/xterm/LICENSE" Link="Assets/xterm.LICENSE" CopyToOutputDirectory="PreserveNewest" />
