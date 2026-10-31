@@ -14,8 +14,7 @@ internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int S
         var total = 0;
         foreach (var workspace in Workspaces)
         {
-            if (workspace is null || string.IsNullOrWhiteSpace(workspace.Title) || workspace.Title.Length > 512
-                || workspace.Title.Any(char.IsControl)) throw new InvalidDataException();
+            if (workspace is null || !WorkspaceTitle.IsValidStored(workspace.Title)) throw new InvalidDataException();
             var leaves = ValidateNode(workspace.Layout, 0, ref total);
             if (workspace.ActivePane < 0 || workspace.ActivePane >= leaves) throw new InvalidDataException();
         }

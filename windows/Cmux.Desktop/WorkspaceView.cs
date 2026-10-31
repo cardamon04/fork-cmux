@@ -2,7 +2,13 @@ namespace Cmux.Desktop;
 
 internal sealed class WorkspaceView(string title) : Panel
 {
-    internal string Title => title;
+    internal string Title { get; private set; } = title;
+    internal bool TryRename(string? value)
+    {
+        if (value is null || !WorkspaceTitle.IsValidRename(value)) return false;
+        Title = value;
+        return true;
+    }
     internal readonly List<WorkspacePane> Panes = [];
     internal readonly Dictionary<SplitContainer, double> PendingRatios = [];
     internal WorkspacePane? Active;
@@ -30,5 +36,5 @@ internal sealed class WorkspaceView(string title) : Panel
         }
         if (Controls.Count != 0) Apply(Controls[0]);
     }
-    public override string ToString() => title;
+    public override string ToString() => Title;
 }
