@@ -129,6 +129,8 @@ internal static class WorkspaceRenameScenario
             {
                 await Edit(restored, () => { _ = restored.ClickAction("RenameWorkspace"); }, dialog =>
                 {
+                    foreach (var button in new[] { Button(dialog, "Confirm"), Button(dialog, "Cancel") })
+                        Require(dialog.ClientRectangle.Contains(dialog.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))), "A rename button is outside the dialog client area.");
                     Capture(dialog, artifacts, "workspace-rename-dialog");
                     Button(dialog, "Cancel").PerformClick();
                 });
@@ -203,8 +205,8 @@ internal static class WorkspaceRenameScenario
     private static void Capture(Control control, string directory, string name)
     {
         Directory.CreateDirectory(directory);
-        using var image = new Bitmap(control.ClientSize.Width, control.ClientSize.Height);
-        control.DrawToBitmap(image, control.ClientRectangle);
+        using var image = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(image, new Rectangle(Point.Empty, control.Size));
         image.Save(Path.Combine(directory, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
     }
     internal static async Task Regression(DesktopWindow window, List<string> passed)

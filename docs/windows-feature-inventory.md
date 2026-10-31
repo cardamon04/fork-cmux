@@ -6,7 +6,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 
 | ID | 要件 | 確認する動作 | 本家の参照先 | Windows側の方法・検証状況 |
 | --- | --- | --- | --- | --- |
-| WIN-001 | F-01 | ウィンドウとワークスペースの作成・移動・終了 | [CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | デスクトップで作成・選択・終了と端末の独立性を実装。並べ替え・複数ウィンドウなど全体は未完了 |
+| WIN-001 | F-01 | ウィンドウとワークスペースの作成・移動・終了 | [CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | デスクトップで作成・選択・終了と端末の独立性、手動の名前変更を実装。sidebarダブルクリックとtoolbarを共通処理へ接続し、取消・入力境界・重複名・pane分離・既存Title欄での保存/通常終了/復元・全9言語を確認。並べ替え・複数ウィンドウ・自動titleなど全体は未完了 |
 | WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 縦横分割・ドラッグサイズ変更・選択・終了時の畳み込みを実装。タブ・移動など未実装 |
 | WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYとxterm.jsをアプリへ統合。対話PowerShell/PSReadLine・Unicode・SGR色・サイズ伝播・終了を実操作で検証。IME処理キーの検索分離とcomposition候補・確定・取消をChromium/CDPと実ConPTY・両PowerShellで検証。OS実IME・全端末互換は未検証 |
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
