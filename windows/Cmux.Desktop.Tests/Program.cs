@@ -28,6 +28,7 @@ internal static class Program
         var pasteOnly = args is ["--paste-limit"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
+        var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape";
         var cwdRegression = args is ["--cwd-regression"];
         var cwdOnly = args.Length > 0 && args[0] == "--cwd-only";
         var cwdShell = args.Length > 0 && args[0] == "--cwd-shell";
@@ -62,6 +63,15 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (imeOnly)
+                {
+                    await ImeScenario.Run(window, passed, args[0] == "--ime-only" ? null : args[0]);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "IME input reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    Require(!Directory.Exists(profile), "IME fixture profile was not removed.");
+                    exitCode = 0;
+                    return;
+                }
                 if (cwdOracle)
                 {
                     await WorkingDirectoryScenario.OracleBoundary(shell, passed);
@@ -309,6 +319,7 @@ internal static class Program
                     await first.Core.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, image);
                 }
                 await window.ClickAction("NewWorkspace");
+                await ImeScenario.Run(window, passed);
                 await TerminalSearchScenario.Run(window, clipboard, passed, args.Length > 0 ? args[0] : null);
                 await window.Shutdown().WaitAsync(Deadline);
                 Require(!Directory.Exists(profile), "Application profile was not removed.");
