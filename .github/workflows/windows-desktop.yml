@@ -1,0 +1,52 @@
+name: Windows desktop
+
+on:
+  pull_request:
+    paths:
+      - 'windows/**'
+      - 'Prototypes/WindowsTerminal/**'
+      - '.github/workflows/windows-desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: ${{ github.repository_owner != 'manaflow-ai' && 'windows-2025' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'blacksmith-4vcpu-windows-2025' || vars.WINDOWS_RUNNER || 'blacksmith-4vcpu-windows-2025' }}
+    timeout-minutes: 12
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+      - name: Install locked local terminal renderer
+        run: npm ci --ignore-scripts --prefix windows/Cmux.Desktop
+      - name: Restore locked desktop dependencies
+        run: dotnet restore windows/Cmux.Desktop.Tests --locked-mode
+      - name: Build application and integration tests
+        run: dotnet build windows/Cmux.Desktop.Tests --no-restore --nologo -warnaserror
+      - name: Exercise visible desktop, real PowerShell and workspace controls
+        shell: pwsh
+        run: |
+          & windows/Cmux.Desktop.Tests/bin/Debug/net10.0-windows/Cmux.Desktop.Tests.exe desktop-results
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload terminal rendering evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-desktop-terminal
+          path: desktop-results/*.png
+          if-no-files-found: ignore

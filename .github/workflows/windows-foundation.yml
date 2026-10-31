@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'Prototypes/WindowsTerminal/**'
+      - 'windows/Cmux.Terminal/**'
       - 'scripts/windows/**'
       - 'tests/test_windows_upstream_report.py'
       - 'docs/windows-upstream-baseline.json'

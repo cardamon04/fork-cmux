@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Fixtures/**/*.cs" />
+    <ProjectReference Include="../../windows/Cmux.Terminal/Cmux.Terminal.csproj" />
   </ItemGroup>
 </Project>

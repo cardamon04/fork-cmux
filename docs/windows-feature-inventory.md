@@ -2,15 +2,15 @@
 
 比較元は`manaflow-ai/cmux`の`main`、コミット`2e4c17c63767048f6a790b071f87e7eca68ff8ae`です。参照先のコード・文書から確認対象を分けた初期一覧であり、全機能の調査完了を示すものではありません。CLI・API・設定・テストからさらに項目を追加する必要があります。
 
-この時点でWindows製品の各項目は**未実装**です。ConPTYプロトタイプの成功を製品の「合格」「同等機能で合格」へ読み替えません。各項目を実装する際に、対応方法、具体的な試験、Windows側のコミット、実行結果と証拠、残る差分を追記します。
+Windows製品は実装途中です。[デスクトップ](../windows/README.md)でワークスペース・分割・PowerShell端末の実操作を追加しましたが、下表の機能群全体の合格ではありません。プロトタイプや部分的な試験の成功を「合格」「同等機能で合格」へ読み替えません。各項目の対応方法、具体的な試験、Windows側のコミット、実行結果と証拠、残る差分を記録します。
 
 | ID | 要件 | 確認する動作 | 本家の参照先 | Windows側の方法・検証状況 |
 | --- | --- | --- | --- | --- |
-| WIN-001 | F-01 | ウィンドウとワークスペースの作成・移動・終了 | [CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | GUI方式を比較してから実装 |
-| WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 未実装 |
-| WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYの技術検証のみ。描画・選択・IME・端末互換は未実装 |
+| WIN-001 | F-01 | ウィンドウとワークスペースの作成・移動・終了 | [CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | デスクトップで作成・選択・終了と端末の独立性を実装。並べ替え・複数ウィンドウなど全体は未完了 |
+| WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 縦横分割・ドラッグサイズ変更・選択・終了時の畳み込みを実装。タブ・移動など未実装 |
+| WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYとxterm.jsをアプリへ統合。対話PowerShell/PSReadLine・Unicode・SGR色・サイズ伝播・終了を実操作で検証。IME・全端末互換は未検証 |
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
-| WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | VT描画器の候補とGhosttyとの差を比較する必要あり |
+| WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | xterm.jsのスクロール・選択とコピー/貼り付けボタンを実装。実マウス選択と注入したクリップボードでコピー/貼り付け経路を検証。OSクリップボード・検索・画像・Ghosttyとの差は未検証/未実装 |
 | WIN-006 | F-03 | CWD、Git、PR、待受ポート、最新通知の表示 | [README](../README.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 未実装 |
 | WIN-007 | F-04 | 通知の受信、未読、ペイン強調、一覧、移動 | [TerminalNotificationStore](../Sources/TerminalNotificationStore.swift)、[CmuxNotifications](../Packages/macOS/CmuxNotifications/) | 未実装 |
 | WIN-008 | F-04 | Windowsのデスクトップ通知 | [CmuxNotifications](../Packages/macOS/CmuxNotifications/) | OS向け実装と通知からの復帰を要検証 |

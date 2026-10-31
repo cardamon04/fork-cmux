@@ -1,25 +1,26 @@
 using System.ComponentModel;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
-namespace WindowsTerminal;
+namespace Cmux.Terminal;
 
 // A single caller owns input, resize and disposal. Output is drained independently
 // from creation through teardown, including when the diagnostic consumer throws.
-internal sealed class ConPtySession : IDisposable
+public sealed class ConPtySession : IDisposable
 {
     private nint console;
     private SafeProcessHandle? process;
-    private FileStream? input;
+    private Stream? input;
     private Task? reader;
     private bool disposed;
 
     private ConPtySession() { }
 
-    internal int ProcessId { get; private set; }
+    public int ProcessId { get; private set; }
 
-    internal static ConPtySession Start(string executable, IReadOnlyList<string> arguments, string directory,
+    public static ConPtySession Start(string executable, IReadOnlyList<string> arguments, string directory,
         short columns, short rows, Action<string> onOutput)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
@@ -34,9 +35,16 @@ internal sealed class ConPtySession : IDisposable
         var session = new ConPtySession();
         try
         {
-            Check(NativeMethods.CreatePipe(out var inputRead, out var inputWrite, 0, 0));
-            using (inputRead)
-            using (inputWrite)
+            // An overlapped input pipe lets the UI cancel a write when a child
+            // stops consuming input. Anonymous CreatePipe handles cannot do so.
+            var pipeName = "cmux-input-" + Guid.NewGuid().ToString("N");
+            session.input = new NamedPipeServerStream(pipeName, PipeDirection.Out, 1,
+                PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            var accepted = ((NamedPipeServerStream)session.input).WaitForConnectionAsync();
+            using var inputClient = new NamedPipeClientStream(".", pipeName, PipeDirection.In);
+            inputClient.Connect(5000);
+            accepted.GetAwaiter().GetResult();
+            using (var inputRead = new SafeFileHandle(inputClient.SafePipeHandle.DangerousGetHandle(), ownsHandle: false))
             {
                 Check(NativeMethods.CreatePipe(out var outputRead, out var outputWrite, 0, 0));
                 using (outputRead)
@@ -46,20 +54,16 @@ internal sealed class ConPtySession : IDisposable
                         new(columns, rows), inputRead, outputWrite, 0, out session.console));
                     // Transfer ownership before constructing the streams. The
                     // temporary native endpoints close after process creation.
-                    var ownedInput = new SafeFileHandle(inputWrite.DangerousGetHandle(), ownsHandle: true);
                     var ownedOutput = new SafeFileHandle(outputRead.DangerousGetHandle(), ownsHandle: true);
-                    inputWrite.SetHandleAsInvalid();
                     outputRead.SetHandleAsInvalid();
                     try
                     {
-                        session.input = new FileStream(ownedInput, FileAccess.Write, 4096, isAsync: false);
                         var output = new FileStream(ownedOutput, FileAccess.Read, 4096, isAsync: false);
                         session.reader = Task.Factory.StartNew(() => Drain(output, onOutput),
                             CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                     }
                     catch
                     {
-                        ownedInput.Dispose();
                         ownedOutput.Dispose();
                         throw;
                     }
@@ -128,7 +132,7 @@ internal sealed class ConPtySession : IDisposable
         return result.Append('\\', slashes * 2).Append('"').ToString();
     }
 
-    internal void Write(string text)
+    public void Write(string text)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var bytes = Encoding.UTF8.GetBytes(text);
@@ -136,14 +140,21 @@ internal sealed class ConPtySession : IDisposable
         input.Flush();
     }
 
-    internal void Resize(short columns, short rows)
+    public async Task WriteAsync(string text, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        await input!.WriteAsync(Encoding.UTF8.GetBytes(text), cancellationToken);
+        await input.FlushAsync(cancellationToken);
+    }
+
+    public void Resize(short columns, short rows)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         ValidateSize(columns, rows);
         Marshal.ThrowExceptionForHR(NativeMethods.ResizePseudoConsole(console, new(columns, rows)));
     }
 
-    internal uint WaitForExit(TimeSpan timeout)
+    public uint WaitForExit(TimeSpan timeout)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (timeout <= TimeSpan.Zero || timeout.TotalMilliseconds >= uint.MaxValue)
