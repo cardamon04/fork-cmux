@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text;
 using System.Diagnostics;
+using System.Globalization;
 using Cmux.Desktop;
 
 internal static class ImeScenario
@@ -14,12 +15,17 @@ internal static class ImeScenario
         await window.ClickAction("Find");
         await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').focus()");
         await pane.Core.CallDevToolsProtocolMethodAsync("Input.insertText", JsonSerializer.Serialize(new { text = "IME_検索" }));
-        try { await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent.endsWith(' / 2')") == "true", "IME key fixture did not establish two search matches."); }
-        catch (TimeoutException)
+        await TerminalSearchScenario.Results(pane, 2);
+        await BoundaryKeys(pane, only, Pass);
+        if (only is null)
         {
-            Console.Error.WriteLine("IME_FIND_LOCALE " + await pane.Core.ExecuteScriptAsync("({locale:document.documentElement.lang,count:document.getElementById('find-results').textContent})"));
-            throw;
+            await Composition(window, pane, Pass, artifacts, shell);
+            await LocaleBoundary(window, pane, Pass, artifacts, shell);
         }
+    }
+
+    private static async Task BoundaryKeys(TerminalPane pane, string? only, Action<string> pass)
+    {
         await pane.Core.ExecuteScriptAsync("window.imeKeys=[];window.addEventListener('keydown',e=>window.imeKeys.push({key:e.key,keyCode:e.keyCode,isComposing:e.isComposing,prevented:e.defaultPrevented}))");
         if (only is null or "--ime-enter" or "--ime-keys")
         {
@@ -32,7 +38,7 @@ internal static class ImeScenario
             await Program.Until(async () => await Position(pane) != before, "Ordinary Enter stopped navigating after an IME key.");
             await Key(pane, "Enter", 13, shift: true);
             await Program.Until(async () => await Position(pane) == before, "Ordinary Shift+Enter stopped navigating after an IME key.");
-            Pass("ime-processed-enter-preserves-search-selection");
+            pass("ime-processed-enter-preserves-search-selection");
         }
         if (only is null or "--ime-escape" or "--ime-keys")
         {
@@ -41,10 +47,37 @@ internal static class ImeScenario
             Require(await pane.Core.ExecuteScriptAsync("!document.getElementById('find-bar').hidden && document.activeElement.id==='find-query'") == "true", "IME-processed Escape dismissed search instead of leaving IME cancellation to the input.");
             await Key(pane, "Escape", 27);
             await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.getElementById('find-bar').hidden && document.activeElement===term.textarea") == "true", "Ordinary Escape stopped dismissing search after an IME key.");
-            Pass("ime-processed-escape-preserves-search-focus");
+            pass("ime-processed-escape-preserves-search-focus");
         }
         else await pane.Core.ExecuteScriptAsync("document.getElementById('find-close').click()");
-        if (only is null) await Composition(window, pane, Pass, artifacts, shell);
+    }
+
+    private static async Task LocaleBoundary(DesktopWindow window, TerminalPane pane, Action<string> pass, string? artifacts, string shell)
+    {
+        var previous = JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.documentElement.lang"))!;
+        try
+        {
+            await ConfigureLocale(pane, "ar-EG");
+            await window.ClickAction("Find");
+            await pane.Core.ExecuteScriptAsync("(()=>{const q=document.getElementById('find-query');q.focus();q.select();})()");
+            await pane.Core.CallDevToolsProtocolMethodAsync("Input.insertText", JsonSerializer.Serialize(new { text = "IME_検索" }));
+            await TerminalSearchScenario.Results(pane, 2);
+            Console.WriteLine("IME_FIND_LOCALE " + await pane.Core.ExecuteScriptAsync("({locale:document.documentElement.lang,count:document.getElementById('find-results').textContent})"));
+            await Capture(pane, artifacts, "ime-arabic-" + shell);
+            await BoundaryKeys(pane, "--ime-keys", name => pass(name + "-ar-EG"));
+        }
+        finally { await ConfigureLocale(pane, previous); }
+    }
+
+    private static async Task ConfigureLocale(TerminalPane pane, string locale)
+    {
+        using var resource = typeof(DesktopWindow).Assembly.GetManifestResourceStream("Cmux.Desktop.Strings.json")!;
+        var catalogs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(resource)!;
+        var localized = new Strings(CultureInfo.GetCultureInfo(locale));
+        var values = catalogs["en"].Keys.ToDictionary(key => key, key => localized[key]);
+        // Use the existing native configure message, without changing the OS locale.
+        pane.Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "configure", locale, strings = values, cwdLimit = WorkingDirectoryReport.MaxUriCharacters }));
+        await Program.Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.documentElement.lang")) == locale, "The renderer did not apply the fixture locale.");
     }
 
     internal static async Task Fallback(ShellLaunch launch, List<string> passed, string? artifacts = null)

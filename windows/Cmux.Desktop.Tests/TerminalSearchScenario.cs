@@ -182,7 +182,7 @@ internal static class TerminalSearchScenario
         foreach (var type in new[] { "mousePressed", "mouseReleased" })
             await pane.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent", JsonSerializer.Serialize(new { type, x = bounds.RootElement.GetProperty("x").GetDouble(), y = bounds.RootElement.GetProperty("y").GetDouble(), button = "left", buttons = type == "mousePressed" ? 1 : 0, clickCount = 1 }));
     }
-    private static Task Results(TerminalPane pane, int count) => Program.Until(async () => count == 0
+    internal static Task Results(TerminalPane pane, int count) => Program.Until(async () => count == 0
         ? JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent")) == new Strings()["FindMissing"]
         : await pane.Core.ExecuteScriptAsync("document.getElementById('find-results').textContent.endsWith(' / '+new Intl.NumberFormat(document.documentElement.lang).format(" + count + "))") == "true", "Find did not produce " + count + " matches.");
     private static async Task Key(TerminalPane pane, string key, int code, bool shift = false)
