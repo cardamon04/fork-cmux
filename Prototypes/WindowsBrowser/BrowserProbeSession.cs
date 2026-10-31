@@ -27,11 +27,24 @@ internal sealed class BrowserProbeSession : IAsyncDisposable
 
     internal static async Task<BrowserProbeSession> Create(nint parent)
     {
+        // The SDK honors this ambient override even when userDataFolder is
+        // supplied. Refuse before environment creation so no override path is
+        // opened, created, joined, or cleaned up by the probe.
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER")))
+            throw new InvalidOperationException("WEBVIEW2_USER_DATA_FOLDER is incompatible with isolated probe profiles.");
         var profile = Directory.CreateTempSubdirectory("cmux-webview-").FullName;
         var session = new BrowserProbeSession(profile);
         try
         {
-            session.environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
+            var createdEnvironment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
+            // Machine policy can also redirect the folder. Validate the actual
+            // path before creating a controller or enrolling this environment
+            // in teardown; it may belong to a browser outside this probe.
+            var actual = Path.TrimEndingDirectorySeparator(Path.GetFullPath(createdEnvironment.UserDataFolder));
+            var expected = Path.TrimEndingDirectorySeparator(Path.GetFullPath(profile));
+            if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("WebView2 selected an unexpected user-data folder; refusing to create a controller.");
+            session.environment = createdEnvironment;
             session.environment.BrowserProcessExited += session.BrowserExited;
             session.controller = await session.environment.CreateCoreWebView2ControllerAsync(parent);
             session.controller.Bounds = new Rectangle(0, 0, 800, 600);

@@ -12,7 +12,7 @@ dotnet build Prototypes/WindowsBrowser --no-restore --nologo -warnaserror
 dotnet run --project Prototypes/WindowsBrowser --no-build -- --self-test
 ```
 
-絞り込みは`--self-test unicode-input-and-trusted-click`など、JSONに出る試験名を指定します。成功は終了コード0、失敗は1、該当試験がない場合は2です。試験は次の6件です。
+絞り込みは`--self-test unicode-input-and-trusted-click`など、JSONに出る試験名を指定します。成功は終了コード0、失敗は1、該当試験がない場合は2です。試験は次の7件です。
 
 - ナビゲーション、履歴、再読み込み、JS評価と日本語の結果。
 - 日本語・絵文字の入力と、ページ側で`isTrusted`を確認するCDPマウスクリック。
@@ -20,9 +20,12 @@ dotnet run --project Prototypes/WindowsBrowser --no-build -- --self-test
 - consoleイベント、networkイベント、JSON応答。
 - 異なる一時プロファイルのcookie/localStorage分離と、終了後の削除。
 - 外部ナビゲーション、事前キャンセル、JS例外、終了済みブラウザの操作を成功扱いしないこと。
+- `WEBVIEW2_USER_DATA_FOLDER`による上書きをブラウザ作成前に拒否し、指定先を作成しないこと。
 
 ページは`https://cmux-probe.invalid`へのリクエストをプロセス内で処理する固定fixtureです。実際のユーザープロファイルやサイトの認証情報へ接続しません。ブラウザのデバッグ用TCPポートやアプリの公開APIは作りません。
 
 作成したプロファイルだけを使用し、コントローラーを閉じた後に`BrowserProcessExited`を待ってから削除します。外側のHWNDが非表示のままであることも各試験で確認します。ユーザーのブラウザを終了せず、リポジトリやOSのセキュリティ設定、既定ブラウザを変更しません。
+
+SDKは引数より環境変数・マシンポリシーを優先する場合があるため、明示的な環境変数の上書きは事前拒否します。環境作成後も実際の`UserDataFolder`を確認し、要求した一時フォルダーと異なる場合はコントローラーを作らず失敗します。予期しない環境の既存プロセスを調査・終了待ち・削除することはありません。マシンポリシーの上書き自体を実機で変更して試す検証は行っていません。
 
 目視したGUI、画面キャプチャ、IME、複数フレーム、要素参照、ページの権限、実アカウント連携、本家の全REPL/CLI/APIはこの試験に含みません。制限したfixtureでのCDPの可否を示す試験であり、製品の機能合格とは区別します。
