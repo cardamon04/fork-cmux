@@ -124,6 +124,7 @@ internal sealed class TerminalPane : WorkspacePane
                     {
                         kind = "configure", locale = System.Globalization.CultureInfo.CurrentUICulture.Name,
                         cwdLimit = WorkingDirectoryReport.MaxUriCharacters, titleLimit = TerminalTitle.MaxCharacters,
+                        windowsBuild = Environment.OSVersion.Version.Build,
                         strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching" }
                             .ToDictionary(key => key, key => strings[key]),
                     }));

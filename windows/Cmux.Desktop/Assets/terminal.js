@@ -84,7 +84,14 @@ window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
   else if (m.kind === 'paste') { if (!find.paste(m.data)) term.paste(m.data); }
-  else if (m.kind === 'configure') { cwdLimit = m.cwdLimit; titleLimit = Number.isSafeInteger(m.titleLimit) && m.titleLimit > 0 ? m.titleLimit : 0; find.configure(m.strings, m.locale); }
+  else if (m.kind === 'configure') {
+    cwdLimit = m.cwdLimit;
+    titleLimit = Number.isSafeInteger(m.titleLimit) && m.titleLimit > 0 ? m.titleLimit : 0;
+    // ConPTY repaints after row growth instead of restoring old scrollback.
+    if (Number.isSafeInteger(m.windowsBuild) && m.windowsBuild > 0)
+      term.options.windowsPty = {backend: 'conpty', buildNumber: m.windowsBuild};
+    find.configure(m.strings, m.locale);
+  }
   else if (m.kind === 'find') find.open();
   else if (m.kind === 'fontSize') fontSize(m.action);
 });
