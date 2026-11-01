@@ -39,6 +39,7 @@ internal static class WorkspaceRenameScenario
             await first.Started.WaitAsync(TimeSpan.FromSeconds(30));
             Track(first);
             await Regression(first, passed);
+            await CaseOnly(first, passed);
             var workspace = first.Current!;
             var pane = workspace.Active;
             var original = workspace.Title;
@@ -227,6 +228,29 @@ internal static class WorkspaceRenameScenario
         await Program.Command(pane, "Write-Output ('AFTER_RENAME_'+'ALIVE')");
         await Program.Contains(pane, "AFTER_RENAME_ALIVE");
         passed.Add("workspace-rename-double-click-updates-label-and-existing-title");
+        Console.WriteLine("passed: " + passed[^1]);
+    }
+
+    private static async Task CaseOnly(DesktopWindow window, List<string> passed)
+    {
+        var workspace = window.Current!;
+        var pane = workspace.Active!;
+        const string before = "Case 日本語😀 & project";
+        const string upper = "CASE 日本語😀 & PROJECT";
+        const string lower = "case 日本語😀 & project";
+        await Rename(window, before);
+        Require(NativeTitle(window) == before, "The exact-case rename fixture did not establish its initial native label.");
+        await Rename(window, upper);
+        Console.WriteLine("WORKSPACE_CASE " + JsonSerializer.Serialize(new { expected = upper, model = workspace.Title, native = NativeTitle(window) }));
+        Require(workspace.Title == upper && NativeTitle(window) == upper, "A case-only toolbar rename left a stale native workspace label.");
+        await Edit(window, () => DoubleClick(window), dialog =>
+        {
+            Input(dialog).Text = lower;
+            Button(dialog, "Confirm").PerformClick();
+        });
+        Require(workspace.Title == lower && NativeTitle(window) == lower, "A case-only row rename left a stale native workspace label.");
+        Require(window.Current == workspace && workspace.Active == pane && pane.ContainsFocus, "Case-only renaming changed the selected live pane.");
+        passed.Add("workspace-rename-case-only-toolbar-and-row-native-label");
         Console.WriteLine("passed: " + passed[^1]);
     }
 
