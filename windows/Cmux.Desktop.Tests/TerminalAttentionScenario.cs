@@ -172,10 +172,15 @@ internal static class TerminalAttentionScenario
             await window.OpenBrowser();
             var browser = (BrowserPane)destination.Active!;
             browserProfile = window.BrowserProfilePath;
+            var address = browser.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip).Items.OfType<ToolStripTextBox>().Single();
+            Require(browser.Core.Source == "about:blank" && address.IsOnOverflow && !address.Control.Visible,
+                "The split browser focus regression must exercise an overflowed address control on about:blank.");
             first.FocusTerminal();
             await Bell(first, () => browser.FocusPane());
             await Program.Until(() => Task.FromResult(first.HasUnread), "A BEL behind a browser did not set unread.");
             Require(destination.Active == browser && browser.ContainsFocus, "BEL stole focus from the browser pane.");
+            Console.WriteLine("ATTENTION_BROWSER_FOCUS " + JsonSerializer.Serialize(new { shell, addressOverflow = address.IsOnOverflow,
+                addressVisible = address.Control.Visible, browserSource = browser.Core.Source, nativeFocus = browser.ContainsFocus }));
             await window.ClickAction("NextUnread");
             Require(destination.Active == first && !first.HasUnread, "Unread navigation from a browser selected the wrong pane.");
             // Keep a different pane unread while closing its workspace, so row

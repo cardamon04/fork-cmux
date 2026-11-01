@@ -248,7 +248,14 @@ internal sealed class BrowserPane : WorkspacePane
         if (failed) { Select(); NotifyActivated(); return; }
         UseNative(() =>
         {
-            if (Core.Source == "about:blank") address.Focus();
+            if (Core.Source == "about:blank")
+            {
+                address.Focus();
+                // A narrow pane can place the address control in overflow.
+                // Keep explicit pane selection inside the browser even when
+                // that hidden control cannot receive native focus.
+                if (!address.Control.Focused) controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+            }
             else controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
         });
         if (failed) Select();
