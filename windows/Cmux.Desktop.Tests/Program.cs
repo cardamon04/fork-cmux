@@ -61,6 +61,7 @@ internal static class Program
         var unicodeF3 = args is ["--unicode-input-f3"];
         var unicodeOnly = args.Length > 0 && args[0] == "--unicode-input-only";
         var titleOnly = args is ["--terminal-title-only"];
+        var fontSizeOnly = args.Length > 0 && args[0] == "--terminal-font-size-only";
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -99,6 +100,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (fontSizeOnly)
+                {
+                    await TerminalFontSizeScenario.Run(shell, passed, args.ElementAtOrDefault(1));
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Terminal font size reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (titleOnly)
                 {
                     await TerminalTitleScenario.Run(shell, passed);
@@ -462,6 +471,7 @@ internal static class Program
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await TerminalFontSizeScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
