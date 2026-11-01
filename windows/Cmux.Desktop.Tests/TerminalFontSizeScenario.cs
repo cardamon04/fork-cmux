@@ -180,7 +180,12 @@ internal static class TerminalFontSizeScenario
             await Program.Until(async () => (await Program.Text(first)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The reset private shell did not finish rendering its prompt.");
             var resetSize = await Size(first);
             Console.WriteLine("FONT_SIZE_RESET " + JsonSerializer.Serialize(new { shell, text = await Program.Text(first), grid = new { resetSize.Font, resetSize.Cols, resetSize.Rows } }));
-            Console.WriteLine("FONT_SIZE_DIAGNOSTIC " + shell + " " + await first.Core.ExecuteScriptAsync("window.cmuxFontDiagnostic"));
+            using (var diagnostic = JsonDocument.Parse(await first.Core.ExecuteScriptAsync("window.cmuxFontDiagnostic")))
+            {
+                Console.WriteLine("FONT_SIZE_DIAGNOSTIC " + JsonSerializer.Serialize(new { shell, dropped = diagnostic.RootElement.GetProperty("dropped").GetInt32(), bytes = diagnostic.RootElement.GetProperty("bytes").GetInt32(), count = diagnostic.RootElement.GetProperty("events").GetArrayLength() }));
+                foreach (var entry in diagnostic.RootElement.GetProperty("events").EnumerateArray())
+                    Console.WriteLine("FONT_SIZE_EVENT " + shell + " " + entry.GetRawText());
+            }
             var retainedText = (await Program.Text(first)).Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal);
             Require(retainedText.Contains($"FONT_DIMS:{enlarged.Cols}:{enlarged.Rows}", StringComparison.Ordinal), "Font/pane resize lost the earlier completed size report from retained output: " + shell);
             await window.ClickAction("ResetFontSize");
