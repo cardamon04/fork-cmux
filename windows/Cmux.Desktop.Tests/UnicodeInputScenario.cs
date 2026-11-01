@@ -58,7 +58,9 @@ internal static class UnicodeInputScenario
             await fixture.Start();
             var value = "日本語🍀😀𝄞e\u0301";
             await fixture.Command("$global:__cmuxUnicodeValue='" + value + "'");
-            Require(await fixture.Frame("$global:__cmuxUnicodeValue") == value, "A mixed supplementary scalar input changed in the shell.");
+            var actualValue = await fixture.Frame("$global:__cmuxUnicodeValue");
+            Console.WriteLine("UNICODE_MIXED_TRACE " + JsonSerializer.Serialize(new { shell = shell.Name, expected = value, actual = actualValue }));
+            Require(actualValue == value, "A mixed supplementary scalar input changed in the shell.");
             Pass(passed, "unicode-input-mixed-scalars-" + shell.Name);
 
             await fixture.Type("$global:__cmuxUnicodeValue='prefix尾';");
