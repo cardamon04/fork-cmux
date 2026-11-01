@@ -71,7 +71,10 @@ internal sealed class DesktopWindow : Form
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
-        var footer = new StatusStrip { ShowItemToolTips = true };
+        var renderer = new ToolStripProfessionalRenderer();
+        // Status values (paths, branch names and errors) are literal data.
+        renderer.RenderItemText += (_, args) => args.TextFormat |= TextFormatFlags.NoPrefix;
+        var footer = new StatusStrip { ShowItemToolTips = true, Renderer = renderer };
         footer.Items.Add(status);
         footer.Items.Add(directoryStatus);
         gitStatus.AccessibleName = strings["GitStatusLabel"];
