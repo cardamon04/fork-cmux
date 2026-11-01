@@ -69,6 +69,20 @@ internal static class GitStatusScenario
             await Git(repository, "worktree", "add", "-b", "linked/別作業", worktree, sha);
             Require(await GitStatus.Read(worktree, CancellationToken.None) == new GitStatus("linked/別作業", false), "Linked-worktree metadata was confused with the main checkout.");
             Pass("git-reader-linked-worktree", passed);
+            var partial = Directory.CreateDirectory(Path.Combine(root, "missing-object checkout")).FullName;
+            await Git(root, "init", partial);
+            await Git(partial, "config", "core.repositoryformatversion", "1");
+            await Git(partial, "config", "extensions.partialClone", "origin");
+            await Git(partial, "config", "remote.origin.url", repository);
+            await Git(partial, "config", "remote.origin.promisor", "true");
+            await Git(partial, "config", "protocol.file.allow", "always");
+            File.WriteAllText(Path.Combine(partial, ".git", "HEAD"), sha + "\n");
+            var objects = Path.Combine(partial, ".git", "objects");
+            Require(!Directory.EnumerateFiles(objects, "*", SearchOption.AllDirectories).Any(), "The missing-object fixture already contained objects.");
+            var missing = await GitStatus.Read(partial, CancellationToken.None);
+            Require(missing is null && !Directory.EnumerateFiles(objects, "*", SearchOption.AllDirectories).Any(),
+                "Reading Git metadata fetched a missing commit from its owned local promisor.");
+            Pass("git-reader-no-promisor-fetch-or-object-writes", passed);
             File.WriteAllText(Path.Combine(repository, ".git", "HEAD"), "not-a-valid-ref\n");
             Require(await GitStatus.Read(repository, CancellationToken.None) is null, "Malformed HEAD was presented as a verified branch.");
             Require(await GitStatus.Read(root, CancellationToken.None) is null
