@@ -3,6 +3,16 @@ using Cmux.Desktop;
 
 internal static class GitStatusScenario
 {
+    internal static async Task Run(ShellLaunch source, List<string> passed, string? artifacts)
+    {
+        await Regression(source, passed);
+        await ReaderCases(passed);
+        await Integration(source, "pwsh", passed, artifacts);
+        var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+        Require(File.Exists(fallback), "The Windows PowerShell Git fixture is unavailable.");
+        await Integration(source with { Executable = fallback }, "windows-powershell", passed, artifacts);
+    }
+
     internal static async Task Regression(ShellLaunch source, List<string> passed)
     {
         var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
@@ -37,6 +47,200 @@ internal static class GitStatusScenario
             if (profile is not null) Require(!Directory.Exists(profile), "The Git fixture profile survived shutdown.");
             DeleteFixture(root);
         }
+    }
+
+    private static async Task ReaderCases(List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
+        var repository = Directory.CreateDirectory(Path.Combine(root, "project & 日本語")).FullName;
+        var child = Directory.CreateDirectory(Path.Combine(repository, "nested")).FullName;
+        try
+        {
+            await Git(root, "init", "-b", "topic/名前&🍀", repository);
+            var unborn = await GitStatus.Read(child, CancellationToken.None);
+            Require(unborn == new GitStatus("topic/名前&🍀", false), "Nested directory/unborn branch resolution lost literal data.");
+            Pass("git-reader-subdirectory-unborn-unicode-literal", passed);
+            await Commit(repository);
+            var sha = await Git(repository, "rev-parse", "HEAD");
+            await Git(repository, "switch", "--detach", sha);
+            Require(await GitStatus.Read(repository, CancellationToken.None) == new GitStatus(sha[..12], true), "Detached HEAD was not resolved from a commit.");
+            Pass("git-reader-detached-head", passed);
+            var worktree = Path.Combine(root, "linked worktree 日本語");
+            await Git(repository, "worktree", "add", "-b", "linked/別作業", worktree, sha);
+            Require(await GitStatus.Read(worktree, CancellationToken.None) == new GitStatus("linked/別作業", false), "Linked-worktree metadata was confused with the main checkout.");
+            Pass("git-reader-linked-worktree", passed);
+            File.WriteAllText(Path.Combine(repository, ".git", "HEAD"), "not-a-valid-ref\n");
+            Require(await GitStatus.Read(repository, CancellationToken.None) is null, "Malformed HEAD was presented as a verified branch.");
+            Require(await GitStatus.Read(root, CancellationToken.None) is null
+                && await GitStatus.Read(Path.Combine(root, "missing"), CancellationToken.None) is null, "Non-repository or missing directories acquired Git state.");
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+            Require(await GitStatus.Read(worktree, canceled.Token) is null, "A canceled metadata request returned a branch.");
+            Pass("git-reader-invalid-non-repository-and-cancellation", passed);
+        }
+        finally { DeleteFixture(root); }
+    }
+
+    private static async Task Integration(ShellLaunch source, string name, List<string> passed, string? artifacts)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
+        var repository = Directory.CreateDirectory(Path.Combine(root, "project & 日本語")).FullName;
+        var other = Directory.CreateDirectory(Path.Combine(root, "other project")).FullName;
+        var history = Path.Combine(root, "history.txt").Replace("'", "''");
+        var initialization = "Set-PSReadLineOption -HistorySaveStyle SaveNothing -HistorySavePath '" + history + "'; function global:prompt { 'CMUX_TEST_READY> ' }";
+        var launch = source with { Directory = repository, Arguments = ShellLaunch.PowerShellArguments(initialization, noProfile: true) };
+        var sessionPath = Path.Combine(root, "layout.json");
+        using var window = new DesktopWindow(launch, new MemoryClipboard(), new SessionStore(sessionPath)) { ShowInTaskbar = false };
+        var processes = new Dictionary<TerminalPane, Process>();
+        var profiles = new HashSet<string>();
+        void Track()
+        {
+            profiles.Add(window.ProfilePath);
+            if (window.BrowserProfilePath is { } profile) profiles.Add(profile);
+            foreach (var pane in window.Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>())
+            {
+                if (processes.ContainsKey(pane)) continue;
+                var process = Process.GetProcessById(pane.ProcessId);
+                _ = process.SafeHandle;
+                processes.Add(pane, process);
+            }
+        }
+        try
+        {
+            const string initial = "topic/名前&🍀";
+            const string changed = "switch/現在&🍀";
+            await Git(root, "init", "-b", initial, repository);
+            await Commit(repository);
+            await Git(root, "init", "-b", "other/別作業", other);
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            Track();
+            var first = (TerminalPane)window.Current!.Active!;
+            await Expect(window, new(initial, false));
+            first.FocusPane();
+            await Program.Command(first, "Write-Output ('GIT_'+ 'READY')");
+            await Program.Contains(first, "GIT_READY");
+            var focusBefore = await first.Core.ExecuteScriptAsync("document.activeElement.classList.contains('xterm-helper-textarea')");
+            Require(focusBefore == "true", "The owned terminal DOM focus precondition failed.");
+            await Git(repository, "switch", "-c", changed);
+            await Expect(window, new(changed, false));
+            Require(window.Current.Active == first
+                && await first.Core.ExecuteScriptAsync("document.activeElement.classList.contains('xterm-helper-textarea')") == "true",
+                "Polling Git moved the selected pane or its owned DOM focus.");
+            Pass("git-" + name + "-same-directory-branch-refresh-and-focus", passed);
+
+            var sha = await Git(repository, "rev-parse", "HEAD");
+            await Git(repository, "switch", "--detach", sha);
+            await Expect(window, new(sha[..12], true));
+            await Git(repository, "switch", changed);
+            await Expect(window, new(changed, false));
+            VerifyLiteralRendering(window, new Strings().Format("GitBranch", changed));
+            Pass("git-" + name + "-literal-native-label-rendering", passed);
+            if (artifacts is not null)
+            {
+                Directory.CreateDirectory(artifacts);
+                var strip = window.Controls.OfType<StatusStrip>().Single();
+                using var image = new Bitmap(strip.Width, strip.Height);
+                strip.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+                image.Save(Path.Combine(artifacts, "git-status-" + name + ".png"));
+            }
+            Pass("git-" + name + "-detached-and-branch-return", passed);
+
+            await window.ClickAction("SplitRight");
+            Track();
+            var second = (TerminalPane)window.Current.Active!;
+            await Change(second, other);
+            await Expect(window, new("other/別作業", false));
+            first.FocusPane();
+            await Expect(window, new(changed, false));
+            second.FocusPane();
+            await Expect(window, new("other/別作業", false));
+            await window.ClickAction("OpenBrowser");
+            Track();
+            Require(Status(window) == "", "A browser retained terminal Git metadata.");
+            await window.ClickAction("ClosePane");
+            first.FocusPane();
+            await Expect(window, new(changed, false));
+            Pass("git-" + name + "-split-and-browser-isolation", passed);
+
+            await window.ClickAction("NewWorkspace");
+            Track();
+            var third = (TerminalPane)window.Current!.Active!;
+            await Change(third, other);
+            await Expect(window, new("other/別作業", false));
+            for (var i = 0; i < 8; i++) { window.SelectWorkspace(0); window.SelectWorkspace(1); }
+            window.SelectWorkspace(0);
+            first.FocusPane();
+            await Expect(window, new(changed, false));
+            await Program.Command(first, "Write-Output ('GIT_AFTER_'+ 'SWITCH')");
+            await Program.Contains(first, "GIT_AFTER_SWITCH");
+            Pass("git-" + name + "-workspace-switch-and-live-shell", passed);
+
+            var headPath = Path.Combine(repository, ".git", "HEAD");
+            var head = File.ReadAllText(headPath);
+            File.WriteAllText(headPath, "malformed-head\n");
+            await Program.Until(() => Task.FromResult(Status(window) == ""), "Unreadable Git state retained a stale branch label.");
+            File.WriteAllText(headPath, head);
+            await Expect(window, new(changed, false));
+            await Change(first, root);
+            await Program.Until(() => Task.FromResult(Status(window) == ""), "Leaving the repository retained its branch.");
+            await Change(first, repository);
+            await Expect(window, new(changed, false));
+            Pass("git-" + name + "-invalid-head-and-non-repository-clear", passed);
+
+            await window.ClickAction("SaveSession");
+            var saved = File.ReadAllText(sessionPath);
+            Require(!saved.Contains(changed, StringComparison.Ordinal) && !saved.Contains("\"Git", StringComparison.Ordinal), "Git display expanded persisted state.");
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            window.FormClosed += (_, _) => closed.TrySetResult();
+            window.Close();
+            await closed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Require(processes.Values.All(process => process.WaitForExit(0)), "An original Git fixture shell survived normal close.");
+            Pass("git-" + name + "-display-only-storage-and-normal-close", passed);
+        }
+        finally
+        {
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            foreach (var process in processes.Values) { Require(process.WaitForExit(0), "An original Git fixture process survived cleanup."); process.Dispose(); }
+            foreach (var profile in profiles) Require(!Directory.Exists(profile), "A Git fixture profile survived cleanup.");
+            DeleteFixture(root);
+        }
+    }
+
+    private static async Task Change(TerminalPane pane, string directory)
+    {
+        await Program.Command(pane, "Set-Location -LiteralPath '" + directory.Replace("'", "''") + "'");
+        await Program.Until(async () => await pane.CaptureWorkingDirectory() == directory, "The native Git fixture did not receive its real CWD.");
+    }
+
+    private static Task Expect(DesktopWindow window, GitStatus state)
+    {
+        var expected = new Strings().Format(state.Detached ? "GitDetached" : "GitBranch", state.Value);
+        return Program.Until(() => Task.FromResult(Status(window) == expected), "The selected pane did not display Git state: " + expected);
+    }
+
+    private static Task<string> Commit(string directory) => Git(directory, "-c", "user.name=Synthetic Cmux", "-c", "user.email=cmux-test@example.invalid", "-c", "commit.gpgSign=false", "commit", "--allow-empty", "-m", "Synthetic fixture");
+
+    private static void VerifyLiteralRendering(DesktopWindow window, string expected)
+    {
+        var strip = window.Controls.OfType<StatusStrip>().Single();
+        string? drawn = null;
+        TextFormatFlags format = 0;
+        ToolStripItemTextRenderEventHandler observed = (_, args) =>
+        {
+            if (ReferenceEquals(args.Item, strip.Items["GitBranch"])) { drawn = args.Text; format = args.TextFormat; }
+        };
+        strip.Renderer.RenderItemText += observed;
+        try
+        {
+            using var bitmap = new Bitmap(strip.Width, strip.Height);
+            strip.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+        }
+        finally { strip.Renderer.RenderItemText -= observed; }
+        Console.WriteLine("git-label-render: " + drawn + " flags=" + format);
+        Require(drawn is not null, "The owned native label did not reach the text renderer.");
+        Require((format & TextFormatFlags.NoPrefix) != 0 ? drawn == expected : drawn == expected.Replace("&", "&&"),
+            "The native Git label treated literal ampersands as mnemonic prefixes.");
     }
 
     private static string Status(DesktopWindow window) =>
