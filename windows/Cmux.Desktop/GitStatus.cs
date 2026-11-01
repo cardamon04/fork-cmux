@@ -29,7 +29,7 @@ internal sealed record GitStatus(string Value, bool Detached)
             return commit is { ExitCode: 0 } && commit.Value.Text.Length is 40 or 64
                 && commit.Value.Text.All(char.IsAsciiHexDigit) ? new(commit.Value.Text[..12], true) : null;
         }
-        catch (Exception error) when (error is IOException or ArgumentException or Win32Exception or OperationCanceledException)
+        catch (Exception error) when (error is IOException or InvalidDataException or ArgumentException or Win32Exception or OperationCanceledException)
         {
             return null;
         }

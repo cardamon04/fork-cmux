@@ -71,10 +71,7 @@ internal sealed class DesktopWindow : Form
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
-        var renderer = new ToolStripProfessionalRenderer();
-        // Status values (paths, branch names and errors) are literal data.
-        renderer.RenderItemText += (_, args) => args.TextFormat |= TextFormatFlags.NoPrefix;
-        var footer = new StatusStrip { ShowItemToolTips = true, Renderer = renderer };
+        var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
         footer.Items.Add(directoryStatus);
         gitStatus.AccessibleName = strings["GitStatusLabel"];
@@ -112,9 +109,16 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
-        directoryStatus.Text = Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "";
-        directoryStatus.ToolTipText = directoryStatus.Text;
+        SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
+    }
+
+    private static void SetStatusText(ToolStripStatusLabel label, string text)
+    {
+        // Escape before WinForms measures and draws mnemonic-bearing text.
+        // Keep the original value available to tooltips and accessibility.
+        label.Text = text.Replace("&", "&&", StringComparison.Ordinal);
+        label.ToolTipText = label.AccessibleDescription = text;
     }
 
     private void UpdateGitTarget()
@@ -126,7 +130,7 @@ internal sealed class DesktopWindow : Form
         gitPane = pane;
         gitDirectory = directory;
         gitRevision++;
-        gitStatus.Text = gitStatus.ToolTipText = "";
+        SetStatusText(gitStatus, "");
         gitQuery?.Cancel();
         if (gitWake.CurrentCount == 0) gitWake.Release();
     }
@@ -147,8 +151,8 @@ internal sealed class DesktopWindow : Form
                     try { result = await Task.Run(() => GitStatus.Read(directory, query.Token)); }
                     finally { gitQuery = null; }
                     if (!shuttingDown && revision == gitRevision)
-                        gitStatus.Text = gitStatus.ToolTipText = result is null ? ""
-                            : strings.Format(result.Detached ? "GitDetached" : "GitBranch", result.Value);
+                        SetStatusText(gitStatus, result is null ? ""
+                            : strings.Format(result.Detached ? "GitDetached" : "GitBranch", result.Value));
                 }
                 await gitWake.WaitAsync(TimeSpan.FromSeconds(2), gitClosing.Token);
             }
@@ -483,7 +487,9 @@ internal sealed class DesktopWindow : Form
         toolbar.Enabled = false;
         if (initialize is not null) await initialize;
         gitClosing.Cancel();
-        if (gitWorker is not null) await gitWorker;
+        Exception? metadataFailure = null;
+        if (gitWorker is not null)
+            try { await gitWorker; } catch (Exception error) { metadataFailure = error; }
         await PendingAction;
         Exception? failure = null;
         foreach (var workspace in Workspaces.ToArray())
@@ -497,6 +503,7 @@ internal sealed class DesktopWindow : Form
         gitWake.Dispose();
         shutdownComplete = true;
         if (failure is not null) throw failure;
+        if (metadataFailure is not null) throw metadataFailure;
     }
 
     private async void CloseWindow(object? sender, FormClosingEventArgs e)
