@@ -9,6 +9,7 @@ internal static class TerminalFontSizeScenario
 {
     internal static async Task Run(ShellLaunch source, List<string> passed, string? artifacts)
     {
+        await RetentionRegression(source, passed);
         var start = new ProcessStartInfo("node") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "TerminalFontSize.Parser.cjs"));
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "Assets"));
@@ -35,6 +36,56 @@ internal static class TerminalFontSizeScenario
         Pass(passed, "terminal-font-size-nine-locale-actions");
         await Integration(source, "pwsh", passed, artifacts);
         await Integration(source with { Executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe") }, "windows-powershell", passed, artifacts);
+    }
+
+    private static async Task RetentionRegression(ShellLaunch source, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-font-size-retain-").FullName;
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        Process? process = null;
+        string? profile = null;
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profile = window.ProfilePath;
+            var pane = (TerminalPane)window.Current!.Active!;
+            process = Process.GetProcessById(pane.ProcessId);
+            _ = process.SafeHandle;
+            await Program.Contains(pane, "CMUX_TEST_READY>");
+            await Program.Command(pane, "foreach ($n in 1..60) { [Console]::WriteLine(('REFLOW_FILL_' + $n)) }");
+            await Program.Contains(pane, "REFLOW_FILL_60");
+            var large = await Size(pane);
+            window.ClientSize = new(1180, 420);
+            await Program.Until(async () => (await Size(pane)).Rows < large.Rows, "The baseline window did not shrink the fixed-font grid.");
+            var small = await Size(pane);
+            var suffix = Guid.NewGuid().ToString("N");
+            var marker = "REFLOW_KEEP_" + suffix;
+            await Program.Command(pane, "Write-Output ('REFLOW_KEEP_' + '" + suffix + "')");
+            await Program.Contains(pane, marker);
+            await Program.Until(async () => (await Program.Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The baseline marker did not reach a completed prompt.");
+            var before = await Program.Text(pane);
+            window.ClientSize = new(1180, 760);
+            await Program.Until(async () => (await Size(pane)).Rows > small.Rows, "The baseline window did not grow the fixed-font grid.");
+            await Program.Command(pane, "Write-Output ('REFLOW_ACK_' + '" + suffix + "')");
+            await Program.Contains(pane, "REFLOW_ACK_" + suffix);
+            await Program.Until(async () => (await Program.Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The baseline resize did not reach a completed prompt.");
+            var after = await Program.Text(pane);
+            var retained = after.Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal).Contains(marker, StringComparison.Ordinal);
+            Require((await Size(pane)).Font == 14, "The fixed-font baseline unexpectedly changed font size.");
+            Console.WriteLine("FONT_SIZE_BASELINE_RETENTION " + JsonSerializer.Serialize(new { scope = "ordinary window resize at fixed 14px; no font/browser/move actions", smallRows = small.Rows, largeRows = large.Rows, retained, marker, before, after }));
+            Require(retained, "An existing fixed-font window resize lost completed output from the retained terminal buffer.");
+            Pass(passed, "terminal-font-size-existing-window-resize-retains-output");
+        }
+        finally
+        {
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            if (process is not null) { Require(process.WaitForExit(0), "The original retention fixture shell survived shutdown."); process.Dispose(); }
+            if (profile is not null) Require(!Directory.Exists(profile), "The retention fixture profile survived shutdown.");
+            var full = Path.GetFullPath(root);
+            Require(Path.GetDirectoryName(full) == Path.TrimEndingDirectorySeparator(Path.GetTempPath()) && Path.GetFileName(full).StartsWith("cmux-font-size-retain-", StringComparison.Ordinal), "Unexpected retention cleanup path.");
+            Directory.Delete(full, recursive: true);
+        }
     }
 
     private static readonly string[] Keys = ["IncreaseFontSize", "DecreaseFontSize", "ResetFontSize"];
@@ -106,6 +157,8 @@ internal static class TerminalFontSizeScenario
             await Program.Contains(first, "FONT_PENDING_日本語🍀");
             await Program.Until(async () => (await Program.Text(first)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The reset private shell did not finish rendering its prompt.");
             Console.WriteLine("FONT_SIZE_RESET " + JsonSerializer.Serialize(new { shell, text = await Program.Text(first), grid = await Size(first) }));
+            var retainedText = (await Program.Text(first)).Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal);
+            Require(retainedText.Contains($"FONT_DIMS:{enlarged.Cols}:{enlarged.Rows}", StringComparison.Ordinal), "Font/pane resize lost the earlier completed size report from retained output: " + shell);
             await window.ClickAction("ResetFontSize");
             Require((await Size(first)).Font == 14, "Repeated reset changed the default font size.");
             if (artifacts is not null)
