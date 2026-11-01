@@ -13,6 +13,7 @@ internal static class Program
     private static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
+        if (GitOutputFixture.RunProcessMode(args) is { } fixtureExit) return fixtureExit;
         if (args is ["--blocked-input"])
         {
             Console.WriteLine("BLOCKED_READY");
@@ -28,6 +29,11 @@ internal static class Program
         var pasteOnly = args is ["--paste-limit"];
         var renameRegression = args is ["--rename-regression"];
         var renameOnly = args.Length > 0 && args[0] == "--rename-only";
+        var gitRegression = args is ["--git-regression"];
+        var gitOnly = args.Length > 0 && args[0] == "--git-only";
+        var gitOutput = args is ["--git-output-regression"];
+        var gitRender = args is ["--git-render-regression"];
+        var gitWorker = args is ["--git-worker-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -66,6 +72,32 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (gitOutput || gitRender || gitWorker)
+                {
+                    if (gitOutput) await GitStatusScenario.OutputBoundary(passed);
+                    else if (gitWorker) await GitStatusScenario.WorkerFailure(shell, passed);
+                    else await GitStatusScenario.Regression(shell, passed, literalPixels: true);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Git failure handling reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (gitOnly)
+                {
+                    await GitStatusScenario.Run(shell, passed, args.ElementAtOrDefault(1));
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Git status reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (gitRegression)
+                {
+                    await GitStatusScenario.Regression(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Git status reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (renameOnly)
                 {
                     await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(1));
@@ -331,6 +363,7 @@ internal static class Program
                 await SessionRegressionScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await GitStatusScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
                 if (args.Length > 0)

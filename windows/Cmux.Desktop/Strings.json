@@ -53,7 +53,10 @@
     "WorkspaceName": "Workspace name",
     "Rename": "Rename",
     "Cancel": "Cancel",
-    "WorkspaceNameInvalid": "Enter a nonblank name of up to {0} characters without control characters."
+    "WorkspaceNameInvalid": "Enter a nonblank name of up to {0} characters without control characters.",
+    "GitStatusLabel": "Git branch",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0} (detached HEAD)"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -109,7 +112,10 @@
     "WorkspaceName": "ワークスペース名",
     "Rename": "変更",
     "Cancel": "キャンセル",
-    "WorkspaceNameInvalid": "空白だけではない{0}文字以内の名前を入力してください。制御文字は使用できません。"
+    "WorkspaceNameInvalid": "空白だけではない{0}文字以内の名前を入力してください。制御文字は使用できません。",
+    "GitStatusLabel": "Gitブランチ",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0}（HEAD切り離し）"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -165,7 +171,10 @@
     "WorkspaceName": "Name des Arbeitsbereichs",
     "Rename": "Umbenennen",
     "Cancel": "Abbrechen",
-    "WorkspaceNameInvalid": "Bitte einen nicht leeren Namen mit höchstens {0} Zeichen ohne Steuerzeichen eingeben."
+    "WorkspaceNameInvalid": "Bitte einen nicht leeren Namen mit höchstens {0} Zeichen ohne Steuerzeichen eingeben.",
+    "GitStatusLabel": "Git-Branch",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0} (losgelöster HEAD)"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -221,7 +230,10 @@
     "WorkspaceName": "Nom de l’espace de travail",
     "Rename": "Renommer",
     "Cancel": "Annuler",
-    "WorkspaceNameInvalid": "Saisissez un nom non vide de {0} caractères maximum, sans caractères de contrôle."
+    "WorkspaceNameInvalid": "Saisissez un nom non vide de {0} caractères maximum, sans caractères de contrôle.",
+    "GitStatusLabel": "Branche Git",
+    "GitBranch": "Git : {0}",
+    "GitDetached": "Git : {0} (HEAD détachée)"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -277,7 +289,10 @@
     "WorkspaceName": "اسم مساحة العمل",
     "Rename": "إعادة التسمية",
     "Cancel": "إلغاء",
-    "WorkspaceNameInvalid": "أدخل اسمًا غير فارغ لا يتجاوز {0} حرفًا، من دون محارف تحكم."
+    "WorkspaceNameInvalid": "أدخل اسمًا غير فارغ لا يتجاوز {0} حرفًا، من دون محارف تحكم.",
+    "GitStatusLabel": "فرع Git",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0} (HEAD منفصل)"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -333,7 +348,10 @@
     "WorkspaceName": "Nombre del espacio de trabajo",
     "Rename": "Renombrar",
     "Cancel": "Cancelar",
-    "WorkspaceNameInvalid": "Introduce un nombre no vacío de hasta {0} caracteres, sin caracteres de control."
+    "WorkspaceNameInvalid": "Introduce un nombre no vacío de hasta {0} caracteres, sin caracteres de control.",
+    "GitStatusLabel": "Rama de Git",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0} (HEAD separado)"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -389,7 +407,10 @@
     "WorkspaceName": "工作區名稱",
     "Rename": "重新命名",
     "Cancel": "取消",
-    "WorkspaceNameInvalid": "請輸入不全為空白、最多 {0} 個字元且不含控制字元的名稱。"
+    "WorkspaceNameInvalid": "請輸入不全為空白、最多 {0} 個字元且不含控制字元的名稱。",
+    "GitStatusLabel": "Git 分支",
+    "GitBranch": "Git：{0}",
+    "GitDetached": "Git：{0}（分離的 HEAD）"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -445,7 +466,10 @@
     "WorkspaceName": "工作区名称",
     "Rename": "重命名",
     "Cancel": "取消",
-    "WorkspaceNameInvalid": "请输入不全为空白、最多 {0} 个字符且不含控制字符的名称。"
+    "WorkspaceNameInvalid": "请输入不全为空白、最多 {0} 个字符且不含控制字符的名称。",
+    "GitStatusLabel": "Git 分支",
+    "GitBranch": "Git：{0}",
+    "GitDetached": "Git：{0}（分离的 HEAD）"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -501,6 +525,9 @@
     "WorkspaceName": "작업 공간 이름",
     "Rename": "이름 바꾸기",
     "Cancel": "취소",
-    "WorkspaceNameInvalid": "공백만 있는 이름은 사용할 수 없습니다. 제어 문자 없이 {0}자 이내로 입력하세요."
+    "WorkspaceNameInvalid": "공백만 있는 이름은 사용할 수 없습니다. 제어 문자 없이 {0}자 이내로 입력하세요.",
+    "GitStatusLabel": "Git 브랜치",
+    "GitBranch": "Git: {0}",
+    "GitDetached": "Git: {0} (분리된 HEAD)"
   }
 }
