@@ -132,6 +132,17 @@ internal static class PaneDetachScenario
             await Program.Command(moved, "$global:cmuxDetachMemory = 'DETACH_PRIVATE_' + 'MEMORY'");
             var outer = (SplitContainer)original.Controls[0];
             var removedSplit = (SplitContainer)outer.Panel2.Controls[0];
+            var toolbar = window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
+            var disabledState = JsonSerializer.Serialize(window.CaptureSession());
+            var pending = window.PendingAction;
+            toolbar.Enabled = false;
+            try
+            {
+                ((ToolStripButton)toolbar.Items["MovePaneToNewWorkspace"]!).PerformClick();
+                Require(ReferenceEquals(pending, window.PendingAction) && JsonSerializer.Serialize(window.CaptureSession()) == disabledState,
+                    "A disabled toolbar transferred a pane during another action.");
+            }
+            finally { toolbar.Enabled = true; }
             await window.ClickAction("MovePaneToNewWorkspace");
             var terminalWorkspace = window.Current!;
             Require(window.Workspaces.SequenceEqual(new[] { original, initial[1], terminalWorkspace })
@@ -231,7 +242,7 @@ internal static class PaneDetachScenario
             Require(await reopenedBrowser.Core.ExecuteScriptAsync("typeof window.paneDetachState") == "\"undefined\"", "Browser memory was unexpectedly persisted.");
             Pass("pane-detach-reopen-directory-browser-url-order-and-selection", passed);
 
-            var pending = restored.PendingAction;
+            pending = restored.PendingAction;
             var state = JsonSerializer.Serialize(restored.CaptureSession());
             await restored.ClickAction("MovePaneToNewWorkspace");
             Require(ReferenceEquals(pending, restored.PendingAction) && state == JsonSerializer.Serialize(restored.CaptureSession()), "A disabled sole-pane action ran.");

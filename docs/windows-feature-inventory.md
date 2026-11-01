@@ -7,7 +7,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | ID | 要件 | 確認する動作 | 本家の参照先 | Windows側の方法・検証状況 |
 | --- | --- | --- | --- | --- |
 | WIN-001 | F-01 | ウィンドウとワークスペースの作成・移動・終了 | [CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 作成・選択・終了、手動の名前変更に加え、選択workspaceの上下並べ替えを実装。既存の選択workspace/pane・実行中shell/browserを保ち、境界/無効操作・重複名・native行表示・既存配列/選択indexの保存/通常終了/復元を確認。renameと行更新の選択保護を共有。全9言語対応。drag/drop・pin/group・複数window・自動titleなど全体は未完了 |
-| WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 縦横分割・ドラッグサイズ変更・選択・終了時の畳み込みを実装。タブ・移動など未実装 |
+| WIN-002 | F-01 | 縦・横タブ、分割、移動、サイズ変更、フォーカス | [dock](dock.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 縦横分割・ドラッグサイズ変更・選択・終了時の畳み込みに加え、選択paneを新workspaceへ移動する操作を実装。元の分割を畳み、同じshell/browser・CWD通知・移動先focusを保持。単一paneは移動不可。元workspaceの終了からの分離、native reparent失敗時の復旧、既存schemaの保存/通常終了/復元を検証。browserはURL欄を選択。全9言語対応。タブ・任意の既存workspace/他windowへの移動・drag/drop・自動title・CLI/API互換などは未完了 |
 | WIN-003 | F-02 | PowerShellの起動・入出力・サイズ変更・終了 | [GhosttyTerminalView](../Sources/GhosttyTerminalView.swift)、[CmuxTerminal](../Packages/macOS/CmuxTerminal/) | ConPTYとxterm.jsをアプリへ統合。対話PowerShell/PSReadLine・Unicode・SGR色・サイズ伝播・終了を実操作で検証。IME処理キーの検索分離とcomposition候補・確定・取消をChromium/CDPと実ConPTY・両PowerShellで検証。OS実IME・全端末互換は未検証 |
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
 | WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | スクロール・選択・コピー/貼り付けに加え、ペイン内の文字列検索・前後移動・大文字小文字切替を実装。実PowerShell出力・スクロールバック・Unicode・折り返し・該当なし・選択コピー・ワークスペース分離・終了・上限を検証。正規表現・全ペイン検索・検索キー設定・OSクリップボード・画像・Ghosttyとの差は未検証/未実装 |
