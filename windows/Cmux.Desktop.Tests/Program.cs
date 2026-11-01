@@ -21,6 +21,11 @@ internal static class Program
             return 0;
         }
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
+        if (args is ["--terminal-title-core"])
+        {
+            try { TerminalTitleScenario.Headless([]).GetAwaiter().GetResult(); return 0; }
+            catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
         if (args is ["--unicode-input-wire"])
         {
             try { UnicodeInputScenario.WireContract([]); return 0; }
@@ -50,6 +55,7 @@ internal static class Program
         var unicodeInput = args is ["--unicode-input-regression"];
         var unicodeF3 = args is ["--unicode-input-f3"];
         var unicodeOnly = args.Length > 0 && args[0] == "--unicode-input-only";
+        var titleOnly = args is ["--terminal-title-only"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -88,6 +94,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (titleOnly)
+                {
+                    await TerminalTitleScenario.Run(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Terminal title reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (unicodeInput || unicodeOnly || unicodeF3)
                 {
                     if (unicodeOnly) await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(1));
@@ -438,6 +452,7 @@ internal static class Program
                 await SessionRegressionScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));

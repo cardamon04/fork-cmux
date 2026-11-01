@@ -19,6 +19,9 @@ internal sealed class TerminalPane : WorkspacePane
     private readonly ShellLaunch launch;
     internal string WorkingDirectory { get; private set; }
     internal event Action? WorkingDirectoryChanged;
+    private readonly TerminalTitle title = new();
+    internal string Title => title.Value;
+    internal event Action? TitleChanged;
     private string? pendingDirectory;
     private string? lastDirectoryReport;
     private long directoryRevision;
@@ -120,7 +123,7 @@ internal sealed class TerminalPane : WorkspacePane
                     Core.PostWebMessageAsJson(JsonSerializer.Serialize(new
                     {
                         kind = "configure", locale = System.Globalization.CultureInfo.CurrentUICulture.Name,
-                        cwdLimit = WorkingDirectoryReport.MaxUriCharacters,
+                        cwdLimit = WorkingDirectoryReport.MaxUriCharacters, titleLimit = TerminalTitle.MaxCharacters,
                         strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching" }
                             .ToDictionary(key => key, key => strings[key]),
                     }));
@@ -144,6 +147,10 @@ internal sealed class TerminalPane : WorkspacePane
                     break;
                 case "focus": if (ContainsFocus) NotifyActivated(); break;
                 case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
+                case "title":
+                    if (root.TryGetProperty("data", out var titleValue) && titleValue.ValueKind == JsonValueKind.String
+                        && title.Update(titleValue.GetString())) TitleChanged?.Invoke();
+                    break;
                 case "cwd":
                     var report = root.GetProperty("data").GetString();
                     if (report is null || report.Length > WorkingDirectoryReport.MaxUriCharacters) break;

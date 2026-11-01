@@ -117,6 +117,16 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
+        UpdateCaption();
+    }
+
+    private void UpdateCaption()
+    {
+        if (!shuttingDown)
+        {
+            var caption = TerminalTitle.Caption(strings, (Current?.Active as TerminalPane)?.Title);
+            if (Text != caption) Text = caption;
+        }
     }
 
     private static void SetStatusText(ToolStripStatusLabel label, string text)
@@ -401,7 +411,11 @@ internal sealed class DesktopWindow : Form
         };
         pane.Failed += ShowError;
         if (pane is TerminalPane terminal)
+        {
             terminal.WorkingDirectoryChanged += () => { if (Current?.Active == terminal) UpdateActions(); };
+            // Title arrival is display-only. Never project focus or selection.
+            terminal.TitleChanged += () => { if (Current?.Active == terminal) UpdateCaption(); };
+        }
         workspace.Panes.Add(pane);
         return pane;
     }

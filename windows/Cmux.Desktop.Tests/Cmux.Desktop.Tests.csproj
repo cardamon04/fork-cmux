@@ -9,6 +9,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Cmux.Desktop/Cmux.Desktop.csproj" /></ItemGroup>
+  <ItemGroup><None Update="TerminalTitle.Parser.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <Target Name="UseOnlyWebViewCore" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" /></ItemGroup>
   </Target>
