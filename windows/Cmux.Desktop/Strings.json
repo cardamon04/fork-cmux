@@ -59,7 +59,8 @@
     "GitDetached": "Git: {0} (detached HEAD)",
     "MoveWorkspaceUp": "Move workspace up",
     "MoveWorkspaceDown": "Move workspace down",
-    "MovePaneToNewWorkspace": "Move pane to new workspace"
+    "MovePaneToNewWorkspace": "Move pane to new workspace",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -121,7 +122,8 @@
     "GitDetached": "Git: {0}（HEAD切り離し）",
     "MoveWorkspaceUp": "ワークスペースを上へ",
     "MoveWorkspaceDown": "ワークスペースを下へ",
-    "MovePaneToNewWorkspace": "ペインを新しいワークスペースへ移動"
+    "MovePaneToNewWorkspace": "ペインを新しいワークスペースへ移動",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -183,7 +185,8 @@
     "GitDetached": "Git: {0} (losgelöster HEAD)",
     "MoveWorkspaceUp": "Arbeitsbereich nach oben",
     "MoveWorkspaceDown": "Arbeitsbereich nach unten",
-    "MovePaneToNewWorkspace": "Bereich in neuen Arbeitsbereich verschieben"
+    "MovePaneToNewWorkspace": "Bereich in neuen Arbeitsbereich verschieben",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -245,7 +248,8 @@
     "GitDetached": "Git : {0} (HEAD détachée)",
     "MoveWorkspaceUp": "Monter l’espace de travail",
     "MoveWorkspaceDown": "Descendre l’espace de travail",
-    "MovePaneToNewWorkspace": "Déplacer le volet vers un nouvel espace de travail"
+    "MovePaneToNewWorkspace": "Déplacer le volet vers un nouvel espace de travail",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -307,7 +311,8 @@
     "GitDetached": "Git: {0} (HEAD منفصل)",
     "MoveWorkspaceUp": "نقل مساحة العمل لأعلى",
     "MoveWorkspaceDown": "نقل مساحة العمل لأسفل",
-    "MovePaneToNewWorkspace": "نقل الجزء إلى مساحة عمل جديدة"
+    "MovePaneToNewWorkspace": "نقل الجزء إلى مساحة عمل جديدة",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -369,7 +374,8 @@
     "GitDetached": "Git: {0} (HEAD separado)",
     "MoveWorkspaceUp": "Subir espacio de trabajo",
     "MoveWorkspaceDown": "Bajar espacio de trabajo",
-    "MovePaneToNewWorkspace": "Mover panel a un nuevo espacio de trabajo"
+    "MovePaneToNewWorkspace": "Mover panel a un nuevo espacio de trabajo",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -431,7 +437,8 @@
     "GitDetached": "Git：{0}（分離的 HEAD）",
     "MoveWorkspaceUp": "將工作區上移",
     "MoveWorkspaceDown": "將工作區下移",
-    "MovePaneToNewWorkspace": "將窗格移至新工作區"
+    "MovePaneToNewWorkspace": "將窗格移至新工作區",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -493,7 +500,8 @@
     "GitDetached": "Git：{0}（分离的 HEAD）",
     "MoveWorkspaceUp": "向上移动工作区",
     "MoveWorkspaceDown": "向下移动工作区",
-    "MovePaneToNewWorkspace": "将窗格移至新工作区"
+    "MovePaneToNewWorkspace": "将窗格移至新工作区",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -555,6 +563,7 @@
     "GitDetached": "Git: {0} (분리된 HEAD)",
     "MoveWorkspaceUp": "작업 공간 위로 이동",
     "MoveWorkspaceDown": "작업 공간 아래로 이동",
-    "MovePaneToNewWorkspace": "패널을 새 작업 공간으로 이동"
+    "MovePaneToNewWorkspace": "패널을 새 작업 공간으로 이동",
+    "TerminalWindowTitle": "{0} — cmux Windows"
   }
 }

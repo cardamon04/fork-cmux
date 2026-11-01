@@ -11,6 +11,20 @@ term.unicode.activeVersion = '11';
 term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
 let win32Input = false;
+let titleLimit = 0, pendingTitle = '', publishedTitle = '', titleTimer = null;
+function queueTitle(data) {
+  if (titleLimit <= 0 || data.length > titleLimit) return;
+  pendingTitle = data;
+  if (titleTimer !== null) return;
+  // Use a fixed cadence so continuous spinner output cannot starve delivery.
+  titleTimer = setTimeout(() => {
+    titleTimer = null;
+    if (publishedTitle === pendingTitle) return;
+    publishedTitle = pendingTitle;
+    send({kind:'title', data:pendingTitle});
+  }, 100);
+}
+term.onTitleChange(queueTitle);
 // ConPTY requests native key records with DECSET 9001. xterm still handles
 // other modes in the same sequence; non-ASCII text can need lossless records.
 for (const [final, enabled] of [['h', true], ['l', false]]) {
@@ -19,7 +33,7 @@ for (const [final, enabled] of [['h', true], ['l', false]]) {
     return false;
   });
 }
-term.parser.registerEscHandler({final:'c'}, () => { win32Input = false; return false; });
+term.parser.registerEscHandler({final:'c'}, () => { win32Input = false; queueTitle(''); return false; });
 const find = createTerminalSearch(term);
 let cwdLimit = 0;
 // xterm owns OSC framing across output chunks. The native side independently
@@ -38,7 +52,7 @@ window.chrome.webview.addEventListener('message', event => {
   const m = event.data;
   if (m.kind === 'output') term.write(m.data, () => send({kind:'ack', id:m.id}));
   else if (m.kind === 'paste') { if (!find.paste(m.data)) term.paste(m.data); }
-  else if (m.kind === 'configure') { cwdLimit = m.cwdLimit; find.configure(m.strings, m.locale); }
+  else if (m.kind === 'configure') { cwdLimit = m.cwdLimit; titleLimit = Number.isSafeInteger(m.titleLimit) && m.titleLimit > 0 ? m.titleLimit : 0; find.configure(m.strings, m.locale); }
   else if (m.kind === 'find') find.open();
 });
 new ResizeObserver(resize).observe(document.getElementById('terminal'));

@@ -43,6 +43,15 @@ function fixture() {
 }
 const title = value => '\x1b]2;' + value + '\x1b\\';
 (async () => {
+  if (process.argv[3] === '--replay') {
+    const capture = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
+    const replay = fixture(); replay.configure();
+    await replay.write(capture.output); replay.flush();
+    check(replay.observed.includes(capture.expected), true, 'Actual ConPTY output contains the expected parsed title');
+    check(replay.titles().at(-1), capture.expected, 'Actual ConPTY title reaches the native-message boundary');
+    console.log(JSON.stringify({status: 'passed', checks, title: replay.titles().at(-1)}));
+    return;
+  }
   const first = fixture();
   await first.write(title('before configure'));
   first.flush();
@@ -64,11 +73,12 @@ const title = value => '\x1b]2;' + value + '\x1b\\';
   await first.write('\x1b]2;frag'); first.flush();
   check(first.titles().length, count, 'An incomplete OSC has no published title');
   await first.write('mented\x1b'); first.flush();
-  check(first.titles().length, count, 'A split ST waits for completion');
+  check(first.titles().at(-1), 'fragmented', 'The pinned parser completes OSC on the escape introducing ST');
+  const afterEscape = first.titles().length;
   await first.write('\\'); first.flush();
-  check(first.titles().at(-1), 'fragmented', 'OSC and ST can span output chunks');
+  check(first.titles().length, afterEscape, 'The rest of a split ST does not duplicate the title');
   const beforeEmbedded = first.titles().length;
-  await first.write('\x1bPignored\x1b]2;not-a-title\x1b\\'); first.flush();
+  await first.write('\x1bP$q]2;not-a-title\x1b\\'); first.flush();
   check(first.titles().length, beforeEmbedded, 'OSC-looking DCS payload is not a title');
   await first.write('\x1b]2;cancelled\x18'); first.flush();
   check(first.titles().length, beforeEmbedded, 'Cancelled OSC is not published');
