@@ -8,6 +8,8 @@ internal static class PaneDetachScenario
     internal static async Task Run(ShellLaunch source, List<string> passed, string? artifacts)
     {
         await Regression(source, passed);
+        await CloseRegression(source, browser: false, passed);
+        await CloseRegression(source, browser: true, passed);
         await Integration(source, passed, artifacts);
         await AdoptionFailure(source, passed);
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
@@ -265,6 +267,66 @@ internal static class PaneDetachScenario
             foreach (var profile in profiles) Require(!Directory.Exists(profile), "A detach integration profile survived cleanup.");
             DeleteFixture(root);
         }
+    }
+
+    internal static async Task CloseRegression(ShellLaunch source, bool browser, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-pane-detach-").FullName;
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        var processes = new List<Process>();
+        var profiles = new List<string>();
+        WorkspacePane? closed = null;
+        void Track(TerminalPane pane)
+        {
+            var process = Process.GetProcessById(pane.ProcessId);
+            _ = process.SafeHandle;
+            processes.Add(process);
+        }
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profiles.Add(window.ProfilePath);
+            var remaining = (TerminalPane)window.Current!.Active!;
+            Track(remaining);
+            await Program.Contains(remaining, "CMUX_TEST_READY>");
+            await window.ClickAction(browser ? "OpenBrowser" : "SplitRight");
+            if (window.BrowserProfilePath is { } browsing) profiles.Add(browsing);
+            closed = window.Current!.Active!;
+            if (closed is TerminalPane terminal) { Track(terminal); await Program.Contains(terminal, "CMUX_TEST_READY>"); }
+            Require(closed.IsHandleCreated && !closed.IsDisposed && window.Current.Panes.Count == 2,
+                "The close discriminator did not create a live split control.");
+            var children = closed.Controls.Cast<Control>().SelectMany(Descendants).ToArray();
+            Require(!browser || children.OfType<TextBox>().Any(control => control.IsHandleCreated), "The browser close fixture has no live address field.");
+            await window.ClickAction("ClosePane");
+            Console.WriteLine("PANE_CLOSE_TRACE " + JsonSerializer.Serialize(new { browser, closed.IsDisposed, closed.IsHandleCreated,
+                detached = closed.Parent is null, children = children.Select(control => new { type = control.GetType().Name, control.IsDisposed, control.IsHandleCreated }) }));
+            Require(closed.IsDisposed && !closed.IsHandleCreated && children.All(control => control.IsDisposed && !control.IsHandleCreated),
+                "ClosePane left its owned " + (browser ? "browser" : "terminal") + " control/child handles alive after resource shutdown.");
+            Require(window.Current.Active == remaining && !remaining.IsDisposed && window.LastError is null, "Closing a split damaged its remaining terminal.");
+            await Program.Command(remaining, "Write-Output ('DETACH_' + 'CLOSE_NEIGHBOR_LIVE')");
+            await Program.Contains(remaining, "DETACH_CLOSE_NEIGHBOR_LIVE");
+            Pass("pane-detach-close-" + (browser ? "browser" : "terminal") + "-disposes-native-control-tree", passed);
+        }
+        finally
+        {
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            // A failing discriminator must release its own orphaned control.
+            closed?.Dispose();
+            foreach (var process in processes) { Require(process.WaitForExit(0), "A close discriminator shell survived shutdown."); process.Dispose(); }
+            foreach (var profile in profiles) Require(!Directory.Exists(profile), "A close discriminator profile survived shutdown.");
+            DeleteFixture(root);
+        }
+    }
+
+    private static IEnumerable<Control> Descendants(Control control)
+    {
+        yield return control;
+        foreach (Control child in control.Controls)
+            foreach (var descendant in Descendants(child)) yield return descendant;
+        if (control is ToolStrip strip)
+            foreach (var item in strip.Items.OfType<ToolStripControlHost>())
+                foreach (var descendant in Descendants(item.Control)) yield return descendant;
     }
 
     private static async Task AdoptionFailure(ShellLaunch source, List<string> passed)

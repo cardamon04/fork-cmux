@@ -38,6 +38,8 @@ internal static class Program
         var orderOnly = args.Length > 0 && args[0] == "--workspace-order-only";
         var detachRegression = args is ["--pane-detach-regression"];
         var detachOnly = args.Length > 0 && args[0] == "--pane-detach-only";
+        var closeTerminal = args is ["--pane-close-terminal-regression"];
+        var closeBrowser = args is ["--pane-close-browser-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -76,6 +78,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (closeTerminal || closeBrowser)
+                {
+                    await PaneDetachScenario.CloseRegression(shell, closeBrowser, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Closing the native pane reached an unexpected UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (detachOnly || detachRegression)
                 {
                     if (detachOnly) await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(1));
