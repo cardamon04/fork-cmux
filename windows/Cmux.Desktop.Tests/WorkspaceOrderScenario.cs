@@ -9,7 +9,7 @@ internal static class WorkspaceOrderScenario
 {
     internal static async Task Run(ShellLaunch source, List<string> passed, string? artifacts)
     {
-        await Regression(source, passed);
+        await Regression(source, passed, artifacts);
         await Integration(source, passed, artifacts);
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
         {
@@ -20,7 +20,7 @@ internal static class WorkspaceOrderScenario
         Pass("workspace-order-nine-locale-actions", passed);
     }
 
-    internal static async Task Regression(ShellLaunch source, List<string> passed)
+    internal static async Task Regression(ShellLaunch source, List<string> passed, string? artifacts = null)
     {
         var root = Directory.CreateTempSubdirectory("cmux-workspace-order-").FullName;
         using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
@@ -52,6 +52,12 @@ internal static class WorkspaceOrderScenario
             Require(window.Current == selected && selected.Active == active, "Reordering changed workspace/pane identity.");
             await Program.Command((TerminalPane)active!, "Write-Output ('ORDER_'+ 'LIVE')");
             await Program.Contains((TerminalPane)active!, "ORDER_LIVE");
+            if (artifacts is not null)
+            {
+                Directory.CreateDirectory(artifacts);
+                Capture(window.Controls.OfType<ListBox>().Single(), Path.Combine(artifacts, "workspace-order-sidebar.png"));
+                Capture(window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip), Path.Combine(artifacts, "workspace-order-controls.png"));
+            }
             Pass("workspace-order-native-up-preserves-live-selection", passed);
         }
         finally
@@ -164,10 +170,7 @@ internal static class WorkspaceOrderScenario
             if (artifacts is not null)
             {
                 Directory.CreateDirectory(artifacts);
-                var sidebar = window.Controls.OfType<ListBox>().Single();
-                using var image = new Bitmap(sidebar.Width, sidebar.Height);
-                sidebar.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
-                image.Save(Path.Combine(artifacts, "workspace-order-sidebar.png"));
+                Capture(window.Controls.OfType<ListBox>().Single(), Path.Combine(artifacts, "workspace-order-duplicates.png"));
             }
             var closed = Closed(window);
             window.Close();
@@ -232,6 +235,13 @@ internal static class WorkspaceOrderScenario
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         form.FormClosed += (_, _) => done.TrySetResult();
         return done.Task;
+    }
+
+    private static void Capture(Control control, string path)
+    {
+        using var image = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+        image.Save(path);
     }
 
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
