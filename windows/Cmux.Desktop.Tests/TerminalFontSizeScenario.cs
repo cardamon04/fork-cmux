@@ -106,6 +106,28 @@ internal static class TerminalFontSizeScenario
             await Program.Contains(first, "CMUX_TEST_READY>");
             var toolbar = window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
             Require(Keys.All(key => toolbar.Items[key] is { Enabled: true }), "The selected terminal has no usable font-size actions.");
+            await first.Core.ExecuteScriptAsync("""
+                (() => {
+                  const trace = window.cmuxFontDiagnostic = {events: [], dropped: 0, bytes: 0};
+                  function capture(kind, extra = {}) {
+                    if (trace.events.length >= 256 || trace.bytes >= 262144) { trace.dropped++; return; }
+                    const b = term.buffer.active;
+                    const entry = {kind, at: performance.now(), font: term.options.fontSize,
+                      cols: term.cols, rows: term.rows, baseY: b.baseY, cursorX: b.cursorX, cursorY: b.cursorY,
+                      windowsPty: term.options.windowsPty, ...extra};
+                    if (kind !== 'output') entry.text = window.cmux.text();
+                    const size = JSON.stringify(entry).length;
+                    if (trace.bytes + size > 262144) { trace.dropped++; return; }
+                    trace.bytes += size; trace.events.push(entry);
+                  }
+                  term.onResize(() => capture('resize'));
+                  term.onWriteParsed(() => capture('parsed'));
+                  window.chrome.webview.addEventListener('message', event => {
+                    if (event.data.kind === 'output') capture('output', {id: event.data.id, data: event.data.data});
+                  });
+                  capture('armed');
+                })()
+                """);
             await window.ClickAction("SplitRight");
             var second = (TerminalPane)window.Current!.Active!;
             Track(second);
@@ -156,7 +178,9 @@ internal static class TerminalFontSizeScenario
                 await first.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key = "Enter", code = "Enter", windowsVirtualKeyCode = 13, nativeVirtualKeyCode = 13, text = type == "keyDown" ? "\r" : "" }));
             await Program.Contains(first, "FONT_PENDING_日本語🍀");
             await Program.Until(async () => (await Program.Text(first)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The reset private shell did not finish rendering its prompt.");
-            Console.WriteLine("FONT_SIZE_RESET " + JsonSerializer.Serialize(new { shell, text = await Program.Text(first), grid = await Size(first) }));
+            var resetSize = await Size(first);
+            Console.WriteLine("FONT_SIZE_RESET " + JsonSerializer.Serialize(new { shell, text = await Program.Text(first), grid = new { resetSize.Font, resetSize.Cols, resetSize.Rows } }));
+            Console.WriteLine("FONT_SIZE_DIAGNOSTIC " + shell + " " + await first.Core.ExecuteScriptAsync("window.cmuxFontDiagnostic"));
             var retainedText = (await Program.Text(first)).Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal);
             Require(retainedText.Contains($"FONT_DIMS:{enlarged.Cols}:{enlarged.Rows}", StringComparison.Ordinal), "Font/pane resize lost the earlier completed size report from retained output: " + shell);
             await window.ClickAction("ResetFontSize");
