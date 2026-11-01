@@ -10,6 +10,16 @@ term.loadAddon(new Unicode11Addon.Unicode11Addon());
 term.unicode.activeVersion = '11';
 term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
+let win32Input = false;
+// ConPTY requests native key records with DECSET 9001. xterm still handles
+// other modes in the same sequence; non-ASCII text can need lossless records.
+for (const [final, enabled] of [['h', true], ['l', false]]) {
+  term.parser.registerCsiHandler({prefix:'?', final}, params => {
+    if (params.includes(9001)) win32Input = enabled;
+    return false;
+  });
+}
+term.parser.registerEscHandler({final:'c'}, () => { win32Input = false; return false; });
 const find = createTerminalSearch(term);
 let cwdLimit = 0;
 // xterm owns OSC framing across output chunks. The native side independently
@@ -19,7 +29,7 @@ term.parser.registerOscHandler(7, data => {
   return true;
 });
 function resize() { const host=document.getElementById('terminal'); if (host.clientWidth > 30 && host.clientHeight > 30) fit.fit(); }
-term.onData(data => send({kind:'input', data}));
+term.onData(data => send({kind:'input', data, win32Input}));
 term.onResize(size => send({kind:'resize', ...size}));
 term.textarea.addEventListener('focus', () => send({kind:'focus'}));
 term.element.addEventListener('pointerdown', event => { if (event.isTrusted) send({kind:'activate'}); });

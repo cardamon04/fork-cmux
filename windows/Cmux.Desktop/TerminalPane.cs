@@ -135,7 +135,8 @@ internal sealed class TerminalPane : WorkspacePane
                         && text.EndsWith(PasteEnd, StringComparison.Ordinal)
                         ? text.Length - PasteStart.Length - PasteEnd.Length : text.Length;
                     if (contentLength > MaxInputCharacters) throw new InvalidOperationException(strings["PasteTooLarge"]);
-                    await connection.Write(text);
+                    var win32Input = root.TryGetProperty("win32Input", out var mode) && mode.ValueKind == JsonValueKind.True;
+                    await connection.Write(ConPtyInput.Encode(text, win32Input));
                     break;
                 case "resize" when connection is not null:
                     var size = SizeFrom(root);
