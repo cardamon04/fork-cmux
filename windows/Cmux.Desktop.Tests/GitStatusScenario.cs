@@ -7,17 +7,18 @@ internal static class GitStatusScenario
     {
         await Regression(source, passed);
         await ReaderCases(passed);
+        await OutputBoundary(passed);
         await Integration(source, "pwsh", passed, artifacts);
         var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
         Require(File.Exists(fallback), "The Windows PowerShell Git fixture is unavailable.");
         await Integration(source with { Executable = fallback }, "windows-powershell", passed, artifacts);
     }
 
-    internal static async Task Regression(ShellLaunch source, List<string> passed)
+    internal static async Task Regression(ShellLaunch source, List<string> passed, bool literalPixels = false)
     {
         var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
         var repository = Directory.CreateDirectory(Path.Combine(root, "repo 日本語 & literal")).FullName;
-        const string branch = "feature/日本語-🍀";
+        var branch = literalPixels ? "feature/a&b" : "feature/日本語-🍀";
         using var window = new DesktopWindow(source with { Directory = repository }, new MemoryClipboard()) { ShowInTaskbar = false };
         Process? shell = null;
         string? profile = null;
@@ -34,7 +35,8 @@ internal static class GitStatusScenario
             await Program.Contains((TerminalPane)window.Current.Active!, "CMUX_TEST_READY>");
             await Program.Until(() => Task.FromResult(Status(window).Contains(branch, StringComparison.Ordinal)),
                 "The selected terminal's real Git branch was not displayed.");
-            Pass("git-native-unborn-branch-visible", passed);
+            if (literalPixels) VerifyLiteralRendering(window, new Strings().Format("GitBranch", branch));
+            Pass(literalPixels ? "git-native-literal-pixel-regression" : "git-native-unborn-branch-visible", passed);
         }
         finally
         {
@@ -47,6 +49,41 @@ internal static class GitStatusScenario
             if (profile is not null) Require(!Directory.Exists(profile), "The Git fixture profile survived shutdown.");
             DeleteFixture(root);
         }
+    }
+
+    internal static async Task OutputBoundary(List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
+        try
+        {
+            var fake = Directory.CreateDirectory(Path.Combine(root, "private tool")).FullName;
+            foreach (var file in Directory.EnumerateFiles(AppContext.BaseDirectory)
+                .Where(path => Path.GetExtension(path) is ".dll" or ".json"))
+                File.Copy(file, Path.Combine(fake, Path.GetFileName(file)));
+            File.Copy(Environment.ProcessPath!, Path.Combine(fake, "git.exe"));
+            var start = new ProcessStartInfo(Environment.ProcessPath!)
+            {
+                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8, StandardErrorEncoding = System.Text.Encoding.UTF8,
+            };
+            start.Environment["CMUX_TEST_GIT_OUTPUT"] = "1";
+            start.Environment["PATH"] = fake;
+            start.ArgumentList.Add("--git-read-output-fixture");
+            start.ArgumentList.Add(root);
+            using var process = Process.Start(start)!;
+            _ = process.SafeHandle;
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15)); }
+            catch { process.Kill(); throw; }
+            var text = await output;
+            var diagnostic = await error;
+            Require(process.ExitCode == 0 && text.Contains("owned-reader-rejected-output", StringComparison.Ordinal),
+                "The owned metadata reader did not reject oversized output safely: " + process.ExitCode + " " + diagnostic);
+            Pass("git-reader-oversized-output-does-not-escape", passed);
+        }
+        finally { DeleteFixture(root); }
     }
 
     private static async Task ReaderCases(List<string> passed)
@@ -238,27 +275,32 @@ internal static class GitStatusScenario
     private static void VerifyLiteralRendering(DesktopWindow window, string expected)
     {
         var strip = window.Controls.OfType<StatusStrip>().Single();
-        string? drawn = null;
-        TextFormatFlags format = 0;
-        ToolStripItemTextRenderEventHandler observed = (_, args) =>
+        var label = strip.Items["GitBranch"]!;
+        var original = label.Text;
+        Bitmap Capture()
         {
-            if (ReferenceEquals(args.Item, strip.Items["GitBranch"])) { drawn = args.Text; format = args.TextFormat; }
-        };
-        strip.Renderer.RenderItemText += observed;
+            strip.PerformLayout();
+            var bitmap = new Bitmap(strip.Width, strip.Height);
+            strip.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+            return bitmap;
+        }
+        using var actual = Capture();
         try
         {
-            using var bitmap = new Bitmap(strip.Width, strip.Height);
-            strip.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+            // A verified escaped native control is the literal-pixel oracle.
+            // RenderItemText is raised after drawing and cannot prove pixels.
+            label.Text = expected.Replace("&", "&&", StringComparison.Ordinal);
+            using var literal = Capture();
+            for (var y = 0; y < actual.Height; y++)
+                for (var x = 0; x < actual.Width; x++)
+                    Require(actual.GetPixel(x, y) == literal.GetPixel(x, y), "The actual native Git pixels do not match literal ampersands.");
         }
-        finally { strip.Renderer.RenderItemText -= observed; }
-        Console.WriteLine("git-label-render: " + drawn + " flags=" + format);
-        Require(drawn is not null, "The owned native label did not reach the text renderer.");
-        Require((format & TextFormatFlags.NoPrefix) != 0 ? drawn == expected : drawn == expected.Replace("&", "&&"),
-            "The native Git label treated literal ampersands as mnemonic prefixes.");
+        finally { label.Text = original; }
+        Console.WriteLine("git-label-pixels: literal control matched " + expected);
     }
 
     private static string Status(DesktopWindow window) =>
-        window.Controls.OfType<StatusStrip>().Single().Items["GitBranch"]?.Text ?? "";
+        window.Controls.OfType<StatusStrip>().Single().Items["GitBranch"]?.ToolTipText ?? "";
 
     private static async Task<string> Git(string directory, params string[] arguments)
     {
