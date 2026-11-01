@@ -30,6 +30,7 @@ function fixture() {
   vm.runInContext(fs.readFileSync(path.join(assets, 'terminal.js'), 'utf8'), context);
   const term = vm.runInContext('term', context);
   const result = {term, messages, send: action => listener({data: {kind: 'fontSize', action}}),
+    configure: windowsBuild => listener({data: {kind: 'configure', windowsBuild, cwdLimit: 0, titleLimit: 0, strings: {}, locale: 'en'}}),
     write: text => new Promise(resolve => term.write(text, resolve)),
     text: () => vm.runInContext('window.cmux.text()', context),
     fittedGrid(width, height, cellWidth, cellHeight) {
@@ -76,5 +77,14 @@ function fixture() {
   check(wide.fittedGrid(4900, 900, 8.4, 17), {cols: 581, rows: 52}, 'An ordinary fitted grid retains the pinned addon calculation');
   check(wide.fittedGrid(4900, 900, 4, 8), {cols: 1000, rows: 112}, 'A small font must not resize the renderer beyond the native column limit');
   check(wide.fittedGrid(9000, 9000, 4, 8), {cols: 1000, rows: 1000}, 'Both fitted axes must respect the existing native size limit');
+  for (const build of [26100, 20348]) {
+    const conpty = fixture(); conpty.configure(build);
+    conpty.term.resize(80, 3);
+    await conpty.write(Array.from({length: 10}, (_, i) => 'CONPTY_LINE_' + i + '\r\n').join(''));
+    const scrollback = conpty.term.buffer.active.baseY;
+    assert.ok(scrollback > 0, 'The ConPTY row-grow discriminator needs scrollback');
+    conpty.term.resize(80, 8);
+    check(conpty.term.buffer.active.baseY, scrollback, 'ConPTY row growth must not pull retained output back into the viewport: Windows build ' + build);
+  }
   console.log(JSON.stringify({status: 'passed', checks, scope: 'Production terminal.js and pinned xterm options/buffer with inert DOM; geometry, focus and ConPTY resize require hosted GUI.'}));
 })().finally(() => {for (const f of fixtures) f.term.dispose();}).catch(error => {console.error(error); process.exitCode = 1;});
