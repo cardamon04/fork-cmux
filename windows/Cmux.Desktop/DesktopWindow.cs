@@ -172,17 +172,23 @@ internal sealed class DesktopWindow : Form
         var selected = Current;
         var active = selected?.Active;
         var toolbarHadFocus = toolbar.ContainsFocus;
-        var previousFence = selectingWorkspace;
-        selectingWorkspace = true;
         try
         {
-            // Disabling a focused toolbar can restore another native pane.
-            // Preserve the selected target and its focus before invoking it.
-            toolbar.Enabled = false;
-            if (toolbarHadFocus && selected == Current) active?.FocusPane();
+            var previousFence = selectingWorkspace;
+            selectingWorkspace = true;
+            try
+            {
+                // Disabling a focused toolbar can restore another native pane.
+                // Preserve the logical target while projecting that UI change.
+                toolbar.Enabled = false;
+            }
+            finally { selectingWorkspace = previousFence; }
+            await action();
+            // A recovery action must run even if its old renderer cannot focus.
+            // Keep focus errors inside the same error/toolbar cleanup boundary.
+            if (toolbarHadFocus && selected == Current && selected?.Active == active) active?.FocusPane();
+            status.Text = strings["Ready"];
         }
-        finally { selectingWorkspace = previousFence; }
-        try { await action(); status.Text = strings["Ready"]; }
         catch (Exception error) { ShowError(error.Message); }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
     }
