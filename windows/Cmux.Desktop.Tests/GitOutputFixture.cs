@@ -7,7 +7,7 @@ internal static class GitOutputFixture
     internal static int? RunProcessMode(string[] args)
     {
         if (Environment.GetEnvironmentVariable("CMUX_TEST_GIT_OUTPUT") != "1") return null;
-        if (Path.GetFileName(Environment.ProcessPath).Equals("git.exe", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(Path.GetFileName(Environment.ProcessPath), "git.exe", StringComparison.OrdinalIgnoreCase))
         {
             Console.Write("refs/heads/" + new string('x', 33000));
             return 0;
