@@ -46,7 +46,8 @@ internal static class TerminalTitleScenario
                 var expected = "ConPTY 日本語 & 🍀 " + shell.Name;
                 var value = Convert.ToBase64String(Encoding.UTF8.GetBytes(expected));
                 var marker = "CMUX_TITLE_READY_" + Guid.NewGuid().ToString("N");
-                var script = "$ErrorActionPreference='Stop'; [Console]::Title=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + value + "')); [Console]::WriteLine('" + marker + "'); [Console]::ReadLine() | Out-Null";
+                var script = "$ErrorActionPreference='Stop'; if(-not $PSVersionTable.PSVersion.ToString().StartsWith('" + (shell.Name == "pwsh" ? "7." : "5.1")
+                    + "')) { throw 'Wrong private title producer runtime' }; [Console]::Title=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + value + "')); [Console]::WriteLine('" + marker + "'); [Console]::ReadLine() | Out-Null";
                 var output = new StringBuilder();
                 var gate = new object();
                 string Captured() { lock (gate) return output.ToString(); }
