@@ -40,6 +40,7 @@ internal static class Program
         var detachOnly = args.Length > 0 && args[0] == "--pane-detach-only";
         var closeTerminal = args is ["--pane-close-terminal-regression"];
         var closeBrowser = args is ["--pane-close-browser-regression"];
+        var detachOverflow = args is ["--pane-detach-overflow-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -78,6 +79,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (detachOverflow)
+                {
+                    await PaneDetachScenario.OverflowRegression(shell, passed, null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "The visible overflow action reached an unexpected UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (closeTerminal || closeBrowser)
                 {
                     await PaneDetachScenario.CloseRegression(shell, closeBrowser, passed);

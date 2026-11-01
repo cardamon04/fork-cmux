@@ -10,6 +10,7 @@ internal static class PaneDetachScenario
         await Regression(source, passed);
         await CloseRegression(source, browser: false, passed);
         await CloseRegression(source, browser: true, passed);
+        await OverflowRegression(source, passed, artifacts);
         await Integration(source, passed, artifacts);
         await AdoptionFailure(source, passed);
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
@@ -153,7 +154,24 @@ internal static class PaneDetachScenario
                 && removedSplit.IsDisposed && !moved.IsDisposed && terminalWorkspace.Controls[0] == moved,
                 "Nested detach replaced an unrelated split or disposed a live pane.");
             await Program.Command(moved, "Set-Location -LiteralPath '" + directories[3].Replace("'", "''", StringComparison.Ordinal) + "'");
-            await Program.Until(() => Task.FromResult(moved.WorkingDirectory == directories[3]), "A moved pane stopped reporting cd.");
+            try { await Program.Until(() => Task.FromResult(moved.WorkingDirectory == directories[3]), "A moved pane stopped reporting cd."); }
+            catch
+            {
+                try
+                {
+                    var fields = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                    Console.WriteLine("DETACH_CWD_FAILURE_TRACE " + JsonSerializer.Serialize(new
+                    {
+                        expected = directories[3], actual = moved.WorkingDirectory, moved.Visible, moved.IsDisposed, moved.IsHandleCreated,
+                        parent = moved.Parent?.GetType().Name, moved.Width, moved.Height, selected = window.Current?.Active == moved,
+                        report = typeof(TerminalPane).GetField("lastDirectoryReport", fields)?.GetValue(moved),
+                        pending = typeof(TerminalPane).GetField("pendingDirectory", fields)?.GetValue(moved),
+                        rendered = await Program.Text(moved),
+                    }));
+                }
+                catch (Exception diagnostic) { Console.WriteLine("DETACH_CWD_DIAGNOSTIC_FAILED " + diagnostic); }
+                throw;
+            }
             var directoryLabel = window.Controls.OfType<StatusStrip>().Single().Items.Find("WorkingDirectory", false).Single();
             Require(directoryLabel.AccessibleDescription!.Contains(directories[3], StringComparison.Ordinal), "Moved cd did not update the selected pane's status.");
             await Program.Command(moved, "Write-Output $global:cmuxDetachMemory");
@@ -316,6 +334,75 @@ internal static class PaneDetachScenario
             foreach (var process in processes) { Require(process.WaitForExit(0), "A close discriminator shell survived shutdown."); process.Dispose(); }
             foreach (var profile in profiles) Require(!Directory.Exists(profile), "A close discriminator profile survived shutdown.");
             DeleteFixture(root);
+        }
+    }
+
+    internal static async Task OverflowRegression(ShellLaunch source, List<string> passed, string? artifacts)
+    {
+        var culture = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
+        var root = Directory.CreateTempSubdirectory("cmux-pane-detach-").FullName;
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        var processes = new List<Process>();
+        string? profile = null;
+        void Track(TerminalPane pane)
+        {
+            var process = Process.GetProcessById(pane.ProcessId); _ = process.SafeHandle; processes.Add(process);
+        }
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profile = window.ProfilePath;
+            window.Size = window.MinimumSize;
+            var workspace = window.Current!;
+            var first = (TerminalPane)workspace.Active!;
+            Track(first);
+            await Program.Contains(first, "CMUX_TEST_READY>");
+            await window.ClickAction("SplitRight");
+            var intended = (TerminalPane)workspace.Active!;
+            Track(intended);
+            await Program.Contains(intended, "CMUX_TEST_READY>");
+            var toolbar = window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
+            toolbar.PerformLayout();
+            var events = new List<object>();
+            foreach (var pane in new[] { first, intended }) pane.Activated += active => events.Add(new
+            {
+                pane = active == intended ? "intended" : "first", toolbar.Enabled,
+                selected = workspace.Active == intended ? "intended" : "first",
+            });
+            toolbar.Focus();
+            var button = (ToolStripButton)toolbar.Items["MovePaneToNewWorkspace"]!;
+            Require(button.Placement == ToolStripItemPlacement.Overflow, "The minimum-width fixture did not place the move action in overflow.");
+            toolbar.OverflowButton.ShowDropDown();
+            var popup = button.GetCurrentParent()!;
+            Require(popup == toolbar.OverflowButton.DropDown && popup.Visible && button.Visible && popup.ClientRectangle.Contains(button.Bounds)
+                && workspace.Active == intended && toolbar.ContainsFocus, "The owned popup did not display the action for the intended pane.");
+            if (artifacts is not null) { Directory.CreateDirectory(artifacts); Capture(popup, Path.Combine(artifacts, "pane-detach-overflow.png")); }
+            button.PerformClick();
+            await window.PendingAction;
+            var destination = window.Current!;
+            Console.WriteLine("PANE_OVERFLOW_TRACE " + JsonSerializer.Serialize(new
+            {
+                events, destinationHasIntended = destination.Panes.Contains(intended), destinationHasFirst = destination.Panes.Contains(first),
+                sourceHasIntended = workspace.Panes.Contains(intended), sourceHasFirst = workspace.Panes.Contains(first), window.LastError,
+            }));
+            toolbar.OverflowButton.HideDropDown();
+            Require(destination != workspace && destination.Active == intended && destination.Panes.SequenceEqual(new[] { intended })
+                && workspace.Panes.SequenceEqual(new[] { first }) && window.LastError is null,
+                "The visible overflow action moved a different live pane than the one selected immediately before invocation.");
+            Require(processes.All(process => !process.WaitForExit(0)), "An overflow action restarted or terminated an original shell.");
+            await Program.Command(intended, "Write-Output ('DETACH_' + 'OVERFLOW_INTENDED_LIVE')");
+            await Program.Contains(intended, "DETACH_OVERFLOW_INTENDED_LIVE");
+            Pass("pane-detach-visible-overflow-preserves-intended-selection", passed);
+        }
+        finally
+        {
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            foreach (var process in processes) { Require(process.WaitForExit(0), "An overflow fixture shell survived shutdown."); process.Dispose(); }
+            if (profile is not null) Require(!Directory.Exists(profile), "An overflow fixture profile survived shutdown.");
+            DeleteFixture(root);
+            CultureInfo.CurrentUICulture = culture;
         }
     }
 
