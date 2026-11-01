@@ -7,6 +7,7 @@ internal static class TerminalAttentionScenario
 {
     internal static async Task Run(ShellLaunch source, List<string> passed)
     {
+        await RestoreDuringBell(source, passed);
         var start = new ProcessStartInfo("node") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "TerminalAttention.Parser.cjs"));
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "Assets"));
@@ -32,6 +33,79 @@ internal static class TerminalAttentionScenario
         Pass(passed, "terminal-attention-nine-locales");
         await Integration(source, "pwsh", passed);
         await Integration(source with { Executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe") }, "windows-powershell", passed);
+    }
+
+    private static async Task RestoreDuringBell(ShellLaunch source, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-attention-restore-").FullName;
+        var path = Path.Combine(root, "layout.json");
+        var gate = Path.Combine(root, "startup-gate");
+        var history = Path.Combine(root, "history.txt");
+        var titles = Enumerable.Range(0, 16).Select(index => "RESTORE_BELL_" + index).ToArray();
+        var snapshot = new SessionSnapshot(SessionSnapshot.CurrentVersion, titles.Length, titles.Length - 1,
+            titles.Select(title => new WorkspaceSnapshot(title, 0, new LayoutSnapshot("terminal", Directory: root))).ToArray());
+        using (var seed = new SessionStore(path)) { _ = seed.Open(); seed.Save(snapshot); }
+        var original = File.ReadAllBytes(path);
+        static string Quote(string text) => text.Replace("'", "''", StringComparison.Ordinal);
+        var launch = source with { Directory = root, Arguments = ["-NoLogo", "-NoProfile", "-NoExit", "-Command",
+            "Set-PSReadLineOption -HistorySaveStyle SaveNothing -HistorySavePath '" + Quote(history) + "'; "
+            + "function global:prompt { 'CMUX_TEST_READY> ' }; while (!(Test-Path -LiteralPath '" + Quote(gate)
+            + "')) { Start-Sleep -Milliseconds 10 }; [Console]::Write([char]7)"] };
+        var store = new SessionStore(path);
+        using var window = new DesktopWindow(launch, new MemoryClipboard(), store) { ShowInTaskbar = false };
+        var processes = new Dictionary<TerminalPane, Process>();
+        var subscriptions = new List<(TerminalPane Pane, Action Handler)>();
+        var early = new HashSet<TerminalPane>();
+        string? profile = null;
+        void Track(TerminalPane pane)
+        {
+            if (processes.ContainsKey(pane)) return;
+            var process = Process.GetProcessById(pane.ProcessId);
+            _ = process.SafeHandle; // Retain the original live producer handle.
+            processes.Add(pane, process);
+        }
+        try
+        {
+            window.Show();
+            await Program.Until(() => Task.FromResult(window.Started.IsCompleted || window.Workspaces.Count() == titles.Length), "The saved workspaces were not mounted before startup.");
+            Require(!window.Started.IsCompleted, "The startup BEL fixture missed the pending restore phase.");
+            foreach (var pane in window.Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().ToArray())
+            {
+                void Observe()
+                {
+                    Track(pane);
+                    if (!window.Started.IsCompleted) early.Add(pane);
+                }
+                pane.Bell += Observe;
+                subscriptions.Add((pane, Observe));
+            }
+            File.WriteAllText(gate, "release");
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profile = window.ProfilePath;
+            var restored = window.Workspaces.ToArray();
+            foreach (var pane in restored.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>()) Track(pane);
+            var unchanged = original.SequenceEqual(File.ReadAllBytes(path));
+            Console.WriteLine("ATTENTION_RESTORE " + JsonSerializer.Serialize(new { startupBells = early.Count,
+                expected = titles.Length, actual = restored.Length, titles = restored.Select(workspace => workspace.Title).ToArray(),
+                canSave = store.CanSave, status = window.SessionStatus, unchanged }));
+            Require(early.Count > 0, "The startup BEL fixture did not interleave notification delivery with restoration.");
+            Require(restored.Select(workspace => workspace.Title).SequenceEqual(titles) && store.CanSave
+                && window.SessionStatus == new Strings()["SessionRestored"], "A startup BEL made a valid saved layout fall back and disabled saving.");
+            Require(unchanged && window.Current == restored[^1], "Startup BEL changed the original save or selected workspace.");
+            Require(early.Where(pane => pane != window.Current!.Active).All(pane => pane.HasUnread), "Restoration discarded unread startup notifications for unviewed panes.");
+            Pass(passed, "terminal-attention-startup-bell-preserves-valid-session-restore");
+        }
+        finally
+        {
+            foreach (var (pane, handler) in subscriptions) pane.Bell -= handler;
+            File.WriteAllText(gate, "release");
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            foreach (var process in processes.Values) { Require(process.WaitForExit(0), "An original startup BEL producer survived shutdown."); process.Dispose(); }
+            if (profile is not null) Require(!Directory.Exists(profile), "The startup BEL profile survived shutdown.");
+            var full = Path.GetFullPath(root);
+            Require(Path.GetDirectoryName(full) == Path.TrimEndingDirectorySeparator(Path.GetTempPath()) && Path.GetFileName(full).StartsWith("cmux-attention-restore-", StringComparison.Ordinal), "Unexpected startup BEL cleanup path.");
+            Directory.Delete(full, recursive: true);
+        }
     }
 
     private static async Task Integration(ShellLaunch source, string shell, List<string> passed)
