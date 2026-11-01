@@ -125,9 +125,13 @@ internal static class TerminalTitleScenario
                 await window.ClickAction("SaveSession");
                 var saved = File.ReadAllBytes(Path.Combine(root, "layout.json"));
                 var literal = "日本語 & 🍀 <tag> {0} " + shell.Name;
-                await SetTitle(pane, literal, delayed: true);
+                var titleGate = Path.Combine(root, "selected-title.release");
+                await SetTitle(pane, literal, titleGate);
                 await window.ClickAction("Find");
                 await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').value='keep focus';document.getElementById('find-query').focus();document.getElementById('find-query').setSelectionRange(2,5)");
+                Require(pane.Title != literal && !File.Exists(titleGate), "The selected title arrived before its causal release.");
+                Require(JsonSerializer.Deserialize<bool>(await pane.Core.ExecuteScriptAsync("document.activeElement.id==='find-query'&&document.activeElement.selectionStart===2&&document.activeElement.selectionEnd===5")), "The find focus/selection precondition was not established.");
+                await File.WriteAllTextAsync(titleGate, "release");
                 await Program.Until(() => Task.FromResult(pane.Title == literal), "The real shell title did not reach its pane.");
                 var expected = TerminalTitle.Caption(new Strings(), literal);
                 Require(window.Text == expected && NativeCaption(window) == expected, "The selected title did not reach the actual native window caption.");
@@ -145,10 +149,13 @@ internal static class TerminalTitleScenario
                 Pass(passed, "terminal-title-native-caption-focus-and-storage-" + shell.Name);
 
                 await pane.Core.ExecuteScriptAsync("document.getElementById('find-close').click()");
-                await SetTitle(pane, "background " + shell.Name, delayed: true);
+                var backgroundGate = Path.Combine(root, "background-title.release");
+                await SetTitle(pane, "background " + shell.Name, backgroundGate);
                 await window.ClickAction("SplitRight");
                 var second = (TerminalPane)window.Current!.Active!;
                 await Program.Contains(second, "CMUX_TEST_READY>");
+                Require(window.Current.Active == second && pane.Title == literal && !File.Exists(backgroundGate), "The background-title isolation precondition was not established.");
+                await File.WriteAllTextAsync(backgroundGate, "release");
                 await Program.Until(() => Task.FromResult(pane.Title == "background " + shell.Name), "The non-selected pane did not retain its own live title.");
                 Require(window.Current.Active == second && window.Text == TerminalTitle.Caption(new Strings(), second.Title), "A background title changed selection or the selected caption.");
                 await window.ClickAction("MovePaneToNewWorkspace");
@@ -170,11 +177,14 @@ internal static class TerminalTitleScenario
         }
     }
 
-    private static Task SetTitle(TerminalPane pane, string value, bool delayed)
+    private static async Task SetTitle(TerminalPane pane, string value, string releasePath)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
-        return Program.Command(pane, (delayed ? "Start-Sleep -Milliseconds 1200; " : "")
+        var gate = releasePath.Replace("'", "''", StringComparison.Ordinal);
+        await Program.Command(pane, "$titleDeadline=[DateTime]::UtcNow.AddSeconds(30); [IO.File]::WriteAllText('" + gate + ".ready','ready'); "
+            + "while(-not [IO.File]::Exists('" + gate + "')) { if([DateTime]::UtcNow -gt $titleDeadline) { throw 'Private title gate timed out' }; Start-Sleep -Milliseconds 20 }; "
             + "[Console]::Title=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + encoded + "'))");
+        await Program.Until(() => Task.FromResult(File.Exists(releasePath + ".ready")), "The owned shell did not enter its private title gate.");
     }
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(IntPtr window, StringBuilder text, int maximum);
     private static string NativeCaption(Form window) { var value = new StringBuilder(2048); GetWindowTextW(window.Handle, value, value.Capacity); return value.ToString(); }
