@@ -70,7 +70,7 @@ internal static class UnicodeInputScenario
     {
         WireContract(passed);
         await Regression(source, passed, artifacts);
-        await FunctionKeyRegression(source, passed);
+        await FunctionKeyCompatibility(source, passed);
         foreach (var shell in new[] { (Name: "windows-powershell", Executable: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe")), (Name: "pwsh", source.Executable) })
         {
             await using var fixture = new Fixture(source, shell.Executable);
@@ -131,36 +131,37 @@ internal static class UnicodeInputScenario
         }
     }
 
-    internal static async Task FunctionKeyRegression(ShellLaunch source, List<string> passed)
+    internal static async Task FunctionKeyCompatibility(ShellLaunch source, List<string> passed)
     {
         foreach (var shell in new[] { (Name: "windows-powershell", Executable: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe")), (Name: "pwsh", source.Executable) })
         {
             await using var fixture = new Fixture(source, shell.Executable);
             await fixture.Start();
-            var marker = Path.Combine(fixture.Root, "function-key.txt");
-            var literal = marker.Replace("'", "''", StringComparison.Ordinal);
-            await fixture.Command("Set-PSReadLineKeyHandler -Chord Ctrl+F3 -ScriptBlock { [IO.File]::AppendAllText('" + literal + "','C') }");
+            var literal = Path.Combine(fixture.Root, "function-key-").Replace("'", "''", StringComparison.Ordinal);
+            // Never open a marker that the callback can still be writing. Each
+            // invocation creates a new file and the host checks metadata only.
+            await fixture.Command("$global:__cmuxF3Count=0; Set-PSReadLineKeyHandler -Chord Ctrl+F3 -ScriptBlock { $global:__cmuxF3Count++; [IO.File]::WriteAllText(('" + literal + "'+$global:__cmuxF3Count+'.txt'),'callback') }");
             await fixture.Pane.Core.ExecuteScriptAsync("window.__f3Packets=[];window.__f3Observer=term.onData(data=>window.__f3Packets.push(data));");
             try
             {
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.Exists(marker) && File.ReadAllText(marker) == "C"), "The private Ctrl+F3 binding did not fire before Unicode input.");
+                await Until(() => Task.FromResult(File.Exists(literal + "1.txt")), "The private Ctrl+F3 binding did not fire before Unicode input.");
                 await fixture.Command("$global:__cmuxF3Unicode='日本語🍀'");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.ReadAllText(marker) == "CC"), "Ctrl+F3 stopped reaching PSReadLine after Unicode input.");
+                await Until(() => Task.FromResult(File.Exists(literal + "2.txt")), "Ctrl+F3 stopped reaching PSReadLine after Unicode input.");
                 // Native input already reached this ConPTY. Its parser remembers
                 // that fact across renderer mode changes and resets.
                 await Parse(fixture.Pane, "\\u001b[?9001l");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.ReadAllText(marker) == "CCC"), "Ctrl+F3 stopped reaching PSReadLine after mode disable.");
+                await Until(() => Task.FromResult(File.Exists(literal + "3.txt")), "Ctrl+F3 stopped reaching PSReadLine after mode disable.");
                 await Parse(fixture.Pane, "\\u001bc");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.ReadAllText(marker) == "CCCC"), "Ctrl+F3 stopped reaching PSReadLine after renderer reset.");
+                await Until(() => Task.FromResult(File.Exists(literal + "4.txt")), "Ctrl+F3 stopped reaching PSReadLine after renderer reset.");
             }
             finally
             {
                 var packets = JsonSerializer.Deserialize<string[]>(await fixture.Pane.Core.ExecuteScriptAsync("window.__f3Packets"));
-                Console.WriteLine("UNICODE_F3_TRACE " + JsonSerializer.Serialize(new { shell = shell.Name, callbacks = File.Exists(marker) ? File.ReadAllText(marker) : "", packets }));
+                Console.WriteLine("UNICODE_F3_TRACE " + JsonSerializer.Serialize(new { shell = shell.Name, callbacks = Directory.GetFiles(fixture.Root, "function-key-*.txt").Select(Path.GetFileName).Order().ToArray(), packets, rendered = await Text(fixture.Pane) }));
                 await fixture.Pane.Core.ExecuteScriptAsync("window.__f3Observer.dispose()");
             }
             Pass(passed, "unicode-input-modified-f3-after-text-disable-and-reset-" + shell.Name);

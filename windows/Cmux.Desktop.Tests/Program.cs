@@ -48,7 +48,7 @@ internal static class Program
         var detachOverflow = args is ["--pane-detach-overflow-regression"];
         var asyncFocus = args is ["--pane-async-focus-regression"];
         var unicodeInput = args is ["--unicode-input-regression"];
-        var unicodeF3 = args is ["--unicode-input-f3-regression"];
+        var unicodeF3 = args is ["--unicode-input-f3"];
         var unicodeOnly = args.Length > 0 && args[0] == "--unicode-input-only";
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
@@ -91,7 +91,7 @@ internal static class Program
                 if (unicodeInput || unicodeOnly || unicodeF3)
                 {
                     if (unicodeOnly) await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(1));
-                    else if (unicodeF3) await UnicodeInputScenario.FunctionKeyRegression(shell, passed);
+                    else if (unicodeF3) await UnicodeInputScenario.FunctionKeyCompatibility(shell, passed);
                     else await UnicodeInputScenario.Regression(shell, passed);
                     Require(uiErrors.Count == 0 && window.LastError is null, "Unicode input reached an unexpected native error.");
                     await window.Shutdown().WaitAsync(Deadline);
