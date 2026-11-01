@@ -21,6 +21,11 @@ internal static class Program
             return 0;
         }
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
+        if (args is ["--browser-load-core"])
+        {
+            try { BrowserLoadStateScenario.Run([]); return 0; }
+            catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
         if (args is ["--terminal-title-core"])
         {
             try { TerminalTitleScenario.Headless([]).GetAwaiter().GetResult(); return 0; }
@@ -299,6 +304,8 @@ internal static class Program
                     await window.ClickAction("NewWorkspace");
                     Track(ownedProcesses, ((TerminalPane)window.Current!.Active!).ProcessId);
                     await BrowserScenario.Run(window, passed, args.Length > 1 ? args[1] : null);
+                    BrowserLoadStateScenario.Run(passed);
+                    await BrowserStopScenario.Run(window, passed, args.ElementAtOrDefault(1));
                     await window.Shutdown().WaitAsync(Deadline);
                     Require(!Directory.Exists(profile), "Application profile was not removed.");
                     Require(window.BrowserProfilePath is { } privateBrowser && !Directory.Exists(privateBrowser), "Browser profile was not removed.");
@@ -447,6 +454,7 @@ internal static class Program
                 Pass("localized-ui-actions", passed);
                 await BrowserFailureScenario.Run(window, passed, uiErrors);
                 await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
+                BrowserLoadStateScenario.Run(passed);
                 await BrowserStopScenario.Run(window, passed, args.ElementAtOrDefault(0));
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);

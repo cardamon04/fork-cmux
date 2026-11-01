@@ -60,7 +60,9 @@
     "MoveWorkspaceUp": "Move workspace up",
     "MoveWorkspaceDown": "Move workspace down",
     "MovePaneToNewWorkspace": "Move pane to new workspace",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "Stop",
+    "NavigationStopped": "Loading stopped."
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -123,7 +125,9 @@
     "MoveWorkspaceUp": "ワークスペースを上へ",
     "MoveWorkspaceDown": "ワークスペースを下へ",
     "MovePaneToNewWorkspace": "ペインを新しいワークスペースへ移動",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "停止",
+    "NavigationStopped": "読み込みを停止しました。"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -186,7 +190,9 @@
     "MoveWorkspaceUp": "Arbeitsbereich nach oben",
     "MoveWorkspaceDown": "Arbeitsbereich nach unten",
     "MovePaneToNewWorkspace": "Bereich in neuen Arbeitsbereich verschieben",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "Stopp",
+    "NavigationStopped": "Laden angehalten."
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -249,7 +255,9 @@
     "MoveWorkspaceUp": "Monter l’espace de travail",
     "MoveWorkspaceDown": "Descendre l’espace de travail",
     "MovePaneToNewWorkspace": "Déplacer le volet vers un nouvel espace de travail",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "Arrêter",
+    "NavigationStopped": "Chargement arrêté."
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -312,7 +320,9 @@
     "MoveWorkspaceUp": "نقل مساحة العمل لأعلى",
     "MoveWorkspaceDown": "نقل مساحة العمل لأسفل",
     "MovePaneToNewWorkspace": "نقل الجزء إلى مساحة عمل جديدة",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "إيقاف",
+    "NavigationStopped": "تم إيقاف التحميل."
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -375,7 +385,9 @@
     "MoveWorkspaceUp": "Subir espacio de trabajo",
     "MoveWorkspaceDown": "Bajar espacio de trabajo",
     "MovePaneToNewWorkspace": "Mover panel a un nuevo espacio de trabajo",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "Detener",
+    "NavigationStopped": "Carga detenida."
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -438,7 +450,9 @@
     "MoveWorkspaceUp": "將工作區上移",
     "MoveWorkspaceDown": "將工作區下移",
     "MovePaneToNewWorkspace": "將窗格移至新工作區",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "停止",
+    "NavigationStopped": "已停止載入。"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -501,7 +515,9 @@
     "MoveWorkspaceUp": "向上移动工作区",
     "MoveWorkspaceDown": "向下移动工作区",
     "MovePaneToNewWorkspace": "将窗格移至新工作区",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "停止",
+    "NavigationStopped": "已停止加载。"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -564,6 +580,8 @@
     "MoveWorkspaceUp": "작업 공간 위로 이동",
     "MoveWorkspaceDown": "작업 공간 아래로 이동",
     "MovePaneToNewWorkspace": "패널을 새 작업 공간으로 이동",
-    "TerminalWindowTitle": "{0} — cmux Windows"
+    "TerminalWindowTitle": "{0} — cmux Windows",
+    "Stop": "중지",
+    "NavigationStopped": "로드를 중지했습니다."
   }
 }
