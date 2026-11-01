@@ -159,6 +159,7 @@ internal static class TerminalFontSizeScenario
             await window.ClickAction("IncreaseFontSize");
             Require((await Size(first)).Font == 24 && (await Size(second)).Font == 14, "A disabled browser action changed terminal state.");
             first.FocusTerminal();
+            var moveTraceStart = int.Parse(await first.Core.ExecuteScriptAsync("window.cmuxFontDiagnostic.events.length"), CultureInfo.InvariantCulture);
             await window.ClickAction("MovePaneToNewWorkspace");
             Require(window.Current!.Active == first && (await Size(first)).Font == 24, "Moving a live pane replaced its font size or identity.");
             window.SelectWorkspace(0);
@@ -185,6 +186,9 @@ internal static class TerminalFontSizeScenario
                 Console.WriteLine("FONT_SIZE_DIAGNOSTIC " + JsonSerializer.Serialize(new { shell, dropped = diagnostic.RootElement.GetProperty("dropped").GetInt32(), bytes = diagnostic.RootElement.GetProperty("bytes").GetInt32(), count = diagnostic.RootElement.GetProperty("events").GetArrayLength() }));
                 foreach (var entry in diagnostic.RootElement.GetProperty("events").EnumerateArray())
                     Console.WriteLine("FONT_SIZE_EVENT " + shell + " " + entry.GetRawText());
+                var moveResizes = diagnostic.RootElement.GetProperty("events").EnumerateArray().Skip(moveTraceStart)
+                    .Where(entry => entry.GetProperty("kind").GetString() == "resize" && entry.GetProperty("font").GetInt32() == 24).ToArray();
+                Require(moveResizes.All(entry => entry.GetProperty("rows").GetInt32() >= enlarged.Rows), "A live move exposed a transient short viewport to ConPTY: " + shell);
             }
             var retainedText = (await Program.Text(first)).Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal);
             Require(retainedText.Contains($"FONT_DIMS:{enlarged.Cols}:{enlarged.Rows}", StringComparison.Ordinal), "Font/pane resize lost the earlier completed size report from retained output: " + shell);
