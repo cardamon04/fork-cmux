@@ -29,5 +29,5 @@ internal sealed class BrowserLoadState
 
     // Null leaves an existing policy/cancellation explanation visible.
     internal string? CompletionStatus(bool success, bool canceled) => success ? "Ready"
-        : canceled ? (StopRequested ? "NavigationStopped" : null) : "NavigationFailed";
+        : StopRequested ? "NavigationStopped" : canceled ? null : "NavigationFailed";
 }

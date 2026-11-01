@@ -75,9 +75,9 @@ internal static class BrowserStopScenario
                 await firstRequest.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
                 await window.ClickAction("OpenBrowser");
                 var second = (BrowserPane)window.Current!.Active!;
+                var secondRequest = fixture.HoldRequest();
                 using (var secondLoading = new Navigation(second))
                 {
-                    var secondRequest = fixture.HoldRequest();
                     second.NavigateFromAddress(fixture.Url(secondRequest.Path));
                     await secondRequest.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
                     Require(!firstRequest.Closed.Task.IsCompleted && !secondRequest.Closed.Task.IsCompleted
@@ -85,12 +85,15 @@ internal static class BrowserStopScenario
                         && browser.IsNavigationEnabled("Stop") && second.IsNavigationEnabled("Stop"), "The two exact connections were not independently pending.");
                     browser.ClickNavigation("Stop");
                     var result = await firstLoading.Completed.WaitAsync(TimeSpan.FromSeconds(20));
-                    await firstRequest.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                    var disconnect = await firstRequest.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
                     Require(!result.Success && IsStopped(result.Error), "The intended first pane did not stop.");
                     Require(!secondRequest.Closed.Task.IsCompleted && !secondLoading.Completed.IsCompleted && second.IsNavigationEnabled("Stop"), "Stopping one pane canceled its neighbor.");
+                    Console.WriteLine("BROWSER_STOP_ISOLATION " + JsonSerializer.Serialize(new { firstRequest = firstRequest.Path, disconnect, secondRequest = secondRequest.Path, neighborStillPending = true }));
                     second.FocusPane();
                 }
                 await window.ClickAction("ClosePane");
+                var closed = await secondRequest.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                Console.WriteLine("BROWSER_STOP_CLOSE " + JsonSerializer.Serialize(new { secondRequest.Path, disconnect = closed }));
             }
             browser.FocusPane();
             await window.ClickAction("ClosePane");
