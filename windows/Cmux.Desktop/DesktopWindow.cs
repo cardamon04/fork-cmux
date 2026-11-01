@@ -169,7 +169,19 @@ internal sealed class DesktopWindow : Form
     private async Task Run(Func<Task> action)
     {
         if (shuttingDown || closingWindow || environment is null) return;
-        toolbar.Enabled = false;
+        var selected = Current;
+        var active = selected?.Active;
+        var toolbarHadFocus = toolbar.ContainsFocus;
+        var previousFence = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            // Disabling a focused toolbar can restore another native pane.
+            // Preserve the selected target and its focus before invoking it.
+            toolbar.Enabled = false;
+            if (toolbarHadFocus && selected == Current) active?.FocusPane();
+        }
+        finally { selectingWorkspace = previousFence; }
         try { await action(); status.Text = strings["Ready"]; }
         catch (Exception error) { ShowError(error.Message); }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
