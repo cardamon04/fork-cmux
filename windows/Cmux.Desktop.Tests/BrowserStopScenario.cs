@@ -22,9 +22,10 @@ internal static class BrowserStopScenario
             await browser.Core.ExecuteScriptAsync("document.querySelector('#name').value='keep 日本語🍀'");
             using (var loading = new Navigation(browser))
             {
-                browser.NavigateFromAddress(fixture.Url("slow"));
-                await fixture.Requested("slow").WaitAsync(TimeSpan.FromSeconds(20));
-                Require(!loading.Completed.IsCompleted && browser.IsNavigationEnabled("Stop"), "The owned request was not pending with Stop available.");
+                var held = fixture.HoldRequest();
+                browser.NavigateFromAddress(fixture.Url(held.Path));
+                await held.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                Require(!held.Closed.Task.IsCompleted && !loading.Completed.IsCompleted && browser.IsNavigationEnabled("Stop"), "The exact owned connection was not pending with Stop available.");
                 browser.ClickNavigation("Stop");
                 var result = await loading.Completed.WaitAsync(TimeSpan.FromSeconds(20));
                 string? source = null;
@@ -37,11 +38,12 @@ internal static class BrowserStopScenario
                     navigationId = loading.Id, status = browser.StatusText,
                     stopEnabled = browser.IsNavigationEnabled("Stop"), source, sourceError,
                 }));
-                Require(!result.Success && result.Error == CoreWebView2WebErrorStatus.OperationCanceled, "Stop did not cancel the actual engine navigation.");
+                var disconnect = await held.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                Require(!result.Success && IsStopped(result.Error), "Stop did not cancel the actual engine navigation.");
                 Require(!browser.IsNavigationEnabled("Stop") && browser.StatusText == new Strings()["NavigationStopped"], "Canceled loading retained the loading state.");
                 var input = JsonSerializer.Deserialize<string>(await browser.Core.ExecuteScriptAsync("document.querySelector('#name').value"));
                 Require(input == "keep 日本語🍀", "Stopping a pending load replaced the committed document/input.");
-                Console.WriteLine("BROWSER_STOP_NATIVE " + JsonSerializer.Serialize(new { result.Success, result.Error, input, status = browser.StatusText }));
+                Console.WriteLine("BROWSER_STOP_NATIVE " + JsonSerializer.Serialize(new { result.Success, error = result.Error.ToString(), input, status = browser.StatusText, held.Path, disconnect }));
             }
             if (artifacts is not null)
             {
@@ -68,20 +70,26 @@ internal static class BrowserStopScenario
 
             using (var firstLoading = new Navigation(browser))
             {
-                browser.NavigateFromAddress(fixture.Url("slow"));
-                await Program.Until(() => Task.FromResult(fixture.Requests("slow") >= 2), "The first pane did not enter its second held request.");
+                var firstRequest = fixture.HoldRequest();
+                browser.NavigateFromAddress(fixture.Url(firstRequest.Path));
+                await firstRequest.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
                 await window.ClickAction("OpenBrowser");
                 var second = (BrowserPane)window.Current!.Active!;
                 using (var secondLoading = new Navigation(second))
                 {
-                    second.NavigateFromAddress(fixture.Url("slow"));
-                    await Program.Until(() => Task.FromResult(fixture.Requests("slow") >= 3), "The second pane's held request did not arrive.");
-                    Require(browser.IsNavigationEnabled("Stop") && second.IsNavigationEnabled("Stop"), "The two pending panes did not retain independent stop state.");
+                    var secondRequest = fixture.HoldRequest();
+                    second.NavigateFromAddress(fixture.Url(secondRequest.Path));
+                    await secondRequest.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                    Require(!firstRequest.Closed.Task.IsCompleted && !secondRequest.Closed.Task.IsCompleted
+                        && !firstLoading.Completed.IsCompleted && !secondLoading.Completed.IsCompleted
+                        && browser.IsNavigationEnabled("Stop") && second.IsNavigationEnabled("Stop"), "The two exact connections were not independently pending.");
                     browser.ClickNavigation("Stop");
-                    Require((await firstLoading.Completed.WaitAsync(TimeSpan.FromSeconds(20))).Error == CoreWebView2WebErrorStatus.OperationCanceled, "The intended first pane did not stop.");
-                    Require(!secondLoading.Completed.IsCompleted && second.IsNavigationEnabled("Stop"), "Stopping one pane canceled its neighbor.");
+                    var result = await firstLoading.Completed.WaitAsync(TimeSpan.FromSeconds(20));
+                    await firstRequest.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                    Require(!result.Success && IsStopped(result.Error), "The intended first pane did not stop.");
+                    Require(!secondRequest.Closed.Task.IsCompleted && !secondLoading.Completed.IsCompleted && second.IsNavigationEnabled("Stop"), "Stopping one pane canceled its neighbor.");
+                    second.FocusPane();
                 }
-                second.FocusPane();
                 await window.ClickAction("ClosePane");
             }
             browser.FocusPane();
@@ -98,6 +106,9 @@ internal static class BrowserStopScenario
             }
         }
     }
+
+    private static bool IsStopped(CoreWebView2WebErrorStatus error) => error is
+        CoreWebView2WebErrorStatus.OperationCanceled or CoreWebView2WebErrorStatus.ConnectionAborted;
 
     private static async Task Navigate(BrowserPane pane, string address)
     {

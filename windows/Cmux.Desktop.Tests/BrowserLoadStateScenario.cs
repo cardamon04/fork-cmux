@@ -37,6 +37,8 @@ internal static class BrowserLoadStateScenario
         state.RequestStop();
         state.Complete(46);
         Require(state.CompletionStatus(false, true) == "NavigationStopped", "An explicit Stop lost its cancellation explanation.");
+        Require(state.CompletionStatus(false, false) == "NavigationStopped", "A requested Stop was shown as a network failure.");
+        Require(state.CompletionStatus(true, false) == "Ready", "A successful completion racing Stop was reported as stopped.");
         Pass(passed, "browser-load-cancellation-preserves-policy-denial");
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
         {
