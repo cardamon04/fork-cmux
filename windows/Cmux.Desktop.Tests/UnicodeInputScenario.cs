@@ -18,6 +18,23 @@ internal static class UnicodeInputScenario
         Console.WriteLine("passed: " + name);
     }
 
+    internal static void WireContract(List<string> passed)
+    {
+        // UTF-8 mouse coordinates and arbitrary protocol payloads are not text
+        // keystrokes, even when they contain printable non-ASCII characters.
+        string[] protocol = ["\u001b[M!!\u00a2", "\u001b]52;c;日本語🍀\u0007", "a\u001b[M!!\u00a2",
+            "\u0090日本語🍀\u009c", "\u009bM!!\u00a2", "\u009d日本語🍀\u009c",
+            "\u001b[200~日本語🍀\n\u001b[201~", "\u001b🍀"];
+        foreach (var input in protocol)
+        {
+            Require(ConPtyInput.Encode(input, true) == input, "A VT protocol payload changed during negotiated text encoding.");
+            Require(ConPtyInput.Encode(input, false) == input, "An unnegotiated VT payload changed.");
+        }
+        Require(ConPtyInput.Encode("ASCII\r\n\t\u0003", true) == "ASCII\r\n\t\u0003", "ASCII or control input changed.");
+        Require(ConPtyInput.Encode("日本語🍀e\u0301", false) == "日本語🍀e\u0301", "Unnegotiated Unicode input changed.");
+        Pass(passed, "unicode-input-protocol-payload-preservation");
+    }
+
     internal static async Task Regression(ShellLaunch source, List<string> passed, string? artifacts = null)
     {
         var executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
@@ -51,6 +68,7 @@ internal static class UnicodeInputScenario
 
     internal static async Task Run(ShellLaunch source, List<string> passed, string? artifacts = null)
     {
+        WireContract(passed);
         await Regression(source, passed, artifacts);
         foreach (var shell in new[] { (Name: "windows-powershell", Executable: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe")), (Name: "pwsh", source.Executable) })
         {

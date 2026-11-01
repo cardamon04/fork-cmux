@@ -21,6 +21,11 @@ internal static class Program
             return 0;
         }
         if (args is ["--packaging-and-locales"]) return PackagingAndLocales();
+        if (args is ["--unicode-input-wire"])
+        {
+            try { UnicodeInputScenario.WireContract([]); return 0; }
+            catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
         if (args is ["--session-store"])
         {
             try { SessionStoreScenario.Run([]); return 0; }
