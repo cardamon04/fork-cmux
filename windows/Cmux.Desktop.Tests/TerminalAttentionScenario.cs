@@ -56,9 +56,29 @@ internal static class TerminalAttentionScenario
             beforeRelease();
             var target = window.Current?.Active;
             await Program.Until(() => Task.FromResult(focusReady?.Invoke() ?? target?.ContainsFocus == true), "The owned target did not acquire native focus before releasing BEL.");
+            if (focusReady is null && target is TerminalPane terminal)
+            {
+                // A newly split WebView can own native focus before its DOM
+                // textarea has ever been focused. Establish that precondition
+                // before BEL, rather than attributing its absence to arrival.
+                await terminal.Core.ExecuteScriptAsync("window.cmux.focus()");
+                await Program.Until(() => TextareaFocused(terminal), "The target textarea was not focused before releasing BEL.");
+            }
+            var selectedBefore = window.Current;
+            var activeBefore = selectedBefore?.Active;
+            var nativeBefore = target?.ContainsFocus == true;
+            bool? domBefore = target is TerminalPane beforeTerminal ? await TextareaFocused(beforeTerminal) : null;
             File.WriteAllText(gate, "release");
             await Program.Contains(pane, "BEL_SENT_" + token);
             await Program.Until(() => Task.FromResult(deliveries == 1), "The shell BEL did not reach its native event exactly once.");
+            bool? domAfter = target is TerminalPane afterTerminal ? await TextareaFocused(afterTerminal) : null;
+            var stable = window.Current == selectedBefore && selectedBefore?.Active == activeBefore
+                && (target?.ContainsFocus == true) == nativeBefore && domAfter == domBefore
+                && (focusReady?.Invoke() ?? true);
+            var evidence = JsonSerializer.Serialize(new { shell, nativeBefore, nativeAfter = target?.ContainsFocus == true,
+                domBefore, domAfter, selectionStable = window.Current == selectedBefore && selectedBefore?.Active == activeBefore, stable, unread = pane.HasUnread });
+            Console.WriteLine("ATTENTION_DELIVERY " + evidence);
+            Require(stable, "BEL changed the established logical/native/DOM focus: " + evidence);
             }
             finally { pane.Bell -= Delivered; }
         }
