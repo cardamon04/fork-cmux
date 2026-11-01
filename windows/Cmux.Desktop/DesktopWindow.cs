@@ -181,12 +181,16 @@ internal sealed class DesktopWindow : Form
                 // Disabling a focused toolbar can restore another native pane.
                 // Preserve the logical target while projecting that UI change.
                 toolbar.Enabled = false;
+                if (toolbarHadFocus && selected == Current && active is { ContainsFocus: false })
+                {
+                    // Restore only during the synchronous projection. A later
+                    // user focus change during the action must remain theirs.
+                    try { active.FocusPane(); }
+                    catch (Exception error) { ShowError(error.Message); }
+                }
             }
             finally { selectingWorkspace = previousFence; }
             await action();
-            // A recovery action must run even if its old renderer cannot focus.
-            // Keep focus errors inside the same error/toolbar cleanup boundary.
-            if (toolbarHadFocus && selected == Current && selected?.Active == active) active?.FocusPane();
             status.Text = strings["Ready"];
         }
         catch (Exception error) { ShowError(error.Message); }
