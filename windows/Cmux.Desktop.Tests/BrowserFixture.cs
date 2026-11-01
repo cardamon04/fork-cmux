@@ -10,6 +10,7 @@ internal sealed class BrowserFixture : IAsyncDisposable
     private readonly ConcurrentBag<Task> clients = [];
     private readonly ConcurrentDictionary<string, int> counts = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource> requested = new();
+    private readonly ConcurrentDictionary<string, HeldRequest> held = new();
     private readonly Task server;
     internal string Origin { get; }
     internal BrowserFixture()
@@ -22,6 +23,22 @@ internal sealed class BrowserFixture : IAsyncDisposable
     internal int Requests(string path) => counts.GetValueOrDefault("/" + path);
     internal Task Requested(string path) => requested.GetOrAdd("/" + path,
         _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+
+    internal HeldRequest HoldRequest()
+    {
+        var request = new HeldRequest("held-" + Guid.NewGuid().ToString("N"));
+        if (!held.TryAdd("/" + request.Path, request)) throw new InvalidOperationException();
+        return request;
+    }
+
+    internal sealed class HeldRequest(string path)
+    {
+        internal string Path { get; } = path;
+        internal readonly TaskCompletionSource Ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource<string> Closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int accepted;
+        internal bool Claim() => Interlocked.Exchange(ref accepted, 1) == 0;
+    }
 
     private async Task Listen()
     {
@@ -52,6 +69,27 @@ internal sealed class BrowserFixture : IAsyncDisposable
                 var path = parts[1].Split('?')[0];
                 var count = counts.AddOrUpdate(path, 1, (_, value) => value + 1);
                 requested.GetOrAdd(path, _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+                if (held.TryGetValue(path, out var pending))
+                {
+                    if (!pending.Claim()) throw new InvalidOperationException("The owned held URL was requested more than once.");
+                    try
+                    {
+                        // Enter an actual socket read before acknowledging the
+                        // held request. No response bytes are sent on this path.
+                        var buffer = new byte[1];
+                        var read = stream.ReadAsync(buffer.AsMemory(), stopping.Token);
+                        pending.Ready.TrySetResult();
+                        while (await read != 0) read = stream.ReadAsync(buffer.AsMemory(), stopping.Token);
+                        if (!stopping.IsCancellationRequested) pending.Closed.TrySetResult("EOF");
+                    }
+                    catch (IOException error) when (error.InnerException is SocketException socket
+                        && socket.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted)
+                    {
+                        if (!stopping.IsCancellationRequested)
+                            pending.Closed.TrySetResult(((SocketException)error.InnerException!).SocketErrorCode.ToString());
+                    }
+                    return;
+                }
                 if (path == "/slow") await Task.Delay(Timeout.Infinite, stopping.Token);
                 var download = path == "/download";
                 var state = path == "/one"

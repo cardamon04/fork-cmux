@@ -15,7 +15,7 @@ internal sealed class BrowserPane : WorkspacePane
     private TaskCompletionSource<bool>? initialDocument;
     private bool stopped;
     private bool failed;
-    private ulong navigationId;
+    private readonly BrowserLoadState loading = new();
     internal override CoreWebView2 Core => controller?.CoreWebView2 ?? throw new ObjectDisposedException(nameof(BrowserPane));
     internal override PaneKind Kind => PaneKind.Browser;
     internal string AddressText => address.Text;
@@ -31,6 +31,7 @@ internal sealed class BrowserPane : WorkspacePane
         AddButton("Back", () => { if (Core.CanGoBack) Core.GoBack(); });
         AddButton("Forward", () => { if (Core.CanGoForward) Core.GoForward(); });
         AddButton("Reload", () => Core.Reload());
+        AddButton("Stop", StopLoading);
         address.AccessibleName = strings["Address"];
         address.ToolTipText = strings["Address"];
         address.Enter += (_, _) => NotifyActivated();
@@ -101,7 +102,7 @@ internal sealed class BrowserPane : WorkspacePane
         {
             if (Unavailable) { e.Cancel = true; return; }
             if (!AllowsTopLevel(e.Uri)) { e.Cancel = true; message.Text = strings["BlockedAddress"]; }
-            else { navigationId = e.NavigationId; message.Text = strings["Loading"]; }
+            else { loading.Begin(e.NavigationId); message.Text = strings["Loading"]; UpdateHistory(); }
         };
         Core.FrameNavigationStarting += (_, e) =>
         {
@@ -120,10 +121,9 @@ internal sealed class BrowserPane : WorkspacePane
         Core.HistoryChanged += (_, _) => UpdateHistory();
         Core.NavigationCompleted += (_, e) =>
         {
-            if (Unavailable || e.NavigationId != navigationId) return;
-            if (e.IsSuccess) message.Text = strings["Ready"];
-            else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
-                message.Text = strings["NavigationFailed"];
+            if (Unavailable || !loading.Complete(e.NavigationId)) return;
+            if (loading.CompletionStatus(e.IsSuccess, e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) is { } status)
+                message.Text = strings[status];
             UpdateHistory();
         };
         UpdateBoundsAndAddress();
@@ -133,7 +133,7 @@ internal sealed class BrowserPane : WorkspacePane
         initialDocument = ready;
         void InitialDocument(object? _, CoreWebView2NavigationCompletedEventArgs e)
         {
-            if (e.NavigationId == navigationId) ready.TrySetResult(e.IsSuccess);
+            if (e.NavigationId == loading.NavigationId) ready.TrySetResult(e.IsSuccess);
         }
         Core.NavigationCompleted += InitialDocument;
         try
@@ -146,6 +146,7 @@ internal sealed class BrowserPane : WorkspacePane
         {
             if (!Unavailable) UseNative(() => core.NavigationCompleted -= InitialDocument);
             initialDocument = null;
+            UpdateHistory();
         }
     }
 
@@ -155,7 +156,15 @@ internal sealed class BrowserPane : WorkspacePane
         {
             navigation.Items["Back"]!.Enabled = Core.CanGoBack;
             navigation.Items["Forward"]!.Enabled = Core.CanGoForward;
+            navigation.Items["Stop"]!.Enabled = initialDocument is null && loading.IsLoading && !loading.StopRequested;
         });
+    }
+
+    private void StopLoading()
+    {
+        if (initialDocument is not null || !loading.RequestStop()) return;
+        Core.Stop();
+        UpdateHistory();
     }
 
     private bool Unavailable => stopped || failed || controller is null;
