@@ -12,6 +12,14 @@ internal sealed class DesktopWindow : Form
     private readonly ToolStripStatusLabel status = new();
     private readonly ToolStripStatusLabel sessionStatus = new() { AutoToolTip = true };
     private readonly ToolStripStatusLabel directoryStatus = new() { Name = "WorkingDirectory", Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly ToolStripStatusLabel gitStatus = new() { Name = "GitBranch", AutoSize = false, Width = 220, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly CancellationTokenSource gitClosing = new();
+    private readonly SemaphoreSlim gitWake = new(0, 1);
+    private CancellationTokenSource? gitQuery;
+    private Task? gitWorker;
+    private TerminalPane? gitPane;
+    private string? gitDirectory;
+    private long gitRevision;
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private WebViewProfile? environment;
     private WebViewProfile? browserEnvironment;
@@ -66,6 +74,8 @@ internal sealed class DesktopWindow : Form
         var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
         footer.Items.Add(directoryStatus);
+        gitStatus.AccessibleName = strings["GitStatusLabel"];
+        footer.Items.Add(gitStatus);
         footer.Items.Add(sessionStatus);
         Controls.Add(content);
         Controls.Add(sidebar);
@@ -101,6 +111,46 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
         directoryStatus.Text = Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "";
         directoryStatus.ToolTipText = directoryStatus.Text;
+        UpdateGitTarget();
+    }
+
+    private void UpdateGitTarget()
+    {
+        if (shuttingDown) return;
+        var pane = Current?.Active as TerminalPane;
+        var directory = pane?.WorkingDirectory;
+        if (pane == gitPane && directory == gitDirectory) return;
+        gitPane = pane;
+        gitDirectory = directory;
+        gitRevision++;
+        gitStatus.Text = gitStatus.ToolTipText = "";
+        gitQuery?.Cancel();
+        if (gitWake.CurrentCount == 0) gitWake.Release();
+    }
+
+    private async Task PollGit()
+    {
+        try
+        {
+            while (!gitClosing.IsCancellationRequested)
+            {
+                _ = gitWake.Wait(0);
+                var revision = gitRevision;
+                if (gitDirectory is { } directory)
+                {
+                    using var query = CancellationTokenSource.CreateLinkedTokenSource(gitClosing.Token);
+                    gitQuery = query;
+                    GitStatus? result;
+                    try { result = await Task.Run(() => GitStatus.Read(directory, query.Token)); }
+                    finally { gitQuery = null; }
+                    if (!shuttingDown && revision == gitRevision)
+                        gitStatus.Text = gitStatus.ToolTipText = result is null ? ""
+                            : strings.Format(result.Detached ? "GitDetached" : "GitBranch", result.Value);
+                }
+                await gitWake.WaitAsync(TimeSpan.FromSeconds(2), gitClosing.Token);
+            }
+        }
+        catch (OperationCanceledException) when (gitClosing.IsCancellationRequested) { }
     }
 
     private async Task Run(Func<Task> action)
@@ -169,6 +219,7 @@ internal sealed class DesktopWindow : Form
             else await NewWorkspace();
             status.Text = strings["Ready"];
             UpdateActions();
+            gitWorker = PollGit();
             started.TrySetResult();
         }
         catch (Exception error)
@@ -428,6 +479,8 @@ internal sealed class DesktopWindow : Form
         shuttingDown = true;
         toolbar.Enabled = false;
         if (initialize is not null) await initialize;
+        gitClosing.Cancel();
+        if (gitWorker is not null) await gitWorker;
         await PendingAction;
         Exception? failure = null;
         foreach (var workspace in Workspaces.ToArray())
@@ -437,6 +490,8 @@ internal sealed class DesktopWindow : Form
         if (browserEnvironment is not null)
             try { await browserEnvironment.DisposeAsync(); } catch (Exception error) { failure ??= error; }
         session?.Dispose();
+        gitClosing.Dispose();
+        gitWake.Dispose();
         shutdownComplete = true;
         if (failure is not null) throw failure;
     }
