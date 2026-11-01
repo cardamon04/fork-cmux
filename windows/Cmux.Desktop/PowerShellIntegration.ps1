@@ -1,4 +1,10 @@
-# Session-local OSC 7 reporting. No profile, history or execution-policy writes.
+# Session-local input protocol and OSC 7 reporting. No profile/history/policy writes.
+# The legacy Windows PowerShell console reader can lose supplementary input.
+# Select PSReadLine's VT path inside this PTY, preserving an explicit override.
+if ($PSVersionTable.PSVersion.Major -eq 5 -and $null -eq $env:PSREADLINE_VTINPUT) {
+    $env:PSREADLINE_VTINPUT = '1'
+}
+
 if ($ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage' -and
     -not (Microsoft.PowerShell.Utility\Get-Variable -Name __cmux_windows_prompt -Scope Global -ErrorAction Ignore)) {
     $cmuxPrompt = Microsoft.PowerShell.Management\Get-Item Function:\prompt -ErrorAction Ignore
