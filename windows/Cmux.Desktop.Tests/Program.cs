@@ -42,6 +42,7 @@ internal static class Program
         var closeBrowser = args is ["--pane-close-browser-regression"];
         var detachOverflow = args is ["--pane-detach-overflow-regression"];
         var asyncFocus = args is ["--pane-async-focus-regression"];
+        var unicodeInput = args is ["--unicode-input-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -80,6 +81,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (unicodeInput)
+                {
+                    await UnicodeInputScenario.Regression(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Unicode input reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (asyncFocus)
                 {
                     await PaneDetachScenario.AsyncFocusRegression(shell, passed, null);
@@ -419,6 +428,7 @@ internal static class Program
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
+                await UnicodeInputScenario.Regression(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
