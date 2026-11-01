@@ -12,8 +12,21 @@ term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
 let win32Input = false;
 let titleLimit = 0, pendingTitle = '', publishedTitle = '', titleTimer = null;
+function validTitle(data) {
+  if (data.length === 0) return true;
+  // Match the native display-title policy before replacing a pending value.
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(data) || /^\p{White_Space}+$/u.test(data)) return false;
+  for (let i = 0; i < data.length; i++) {
+    const unit = data.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = data.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
+  }
+  return true;
+}
 function queueTitle(data) {
-  if (titleLimit <= 0 || data.length > titleLimit) return;
+  if (titleLimit <= 0 || data.length > titleLimit || !validTitle(data)) return;
   pendingTitle = data;
   if (titleTimer !== null) return;
   // Use a fixed cadence so continuous spinner output cannot starve delivery.
