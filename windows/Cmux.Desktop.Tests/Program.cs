@@ -447,6 +447,7 @@ internal static class Program
                 Pass("localized-ui-actions", passed);
                 await BrowserFailureScenario.Run(window, passed, uiErrors);
                 await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
+                await BrowserStopScenario.Run(window, passed, args.ElementAtOrDefault(0));
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
