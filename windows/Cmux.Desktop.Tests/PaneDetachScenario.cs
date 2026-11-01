@@ -91,8 +91,9 @@ internal static class PaneDetachScenario
         ]);
         using (var store = new SessionStore(path)) { _ = store.Open(); store.Save(seed); }
         var originalFile = File.ReadAllBytes(path);
-        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
-        using var restored = new DesktopWindow(source with { Directory = root }, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
+        var launch = source with { Directory = root, Arguments = ShellLaunch.PowerShellArguments(source.Arguments[^1], noProfile: true) };
+        using var window = new DesktopWindow(launch, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
+        using var restored = new DesktopWindow(launch, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
         var processes = new Dictionary<TerminalPane, Process>();
         var profiles = new HashSet<string>();
         void Track(DesktopWindow target)
@@ -119,6 +120,12 @@ internal static class PaneDetachScenario
             var other = (TerminalPane)initial[1].Active!;
             var browser = original.Panes.OfType<BrowserPane>().Single();
             foreach (var terminal in new[] { remaining, moved, other }) await Program.Contains(terminal, "CMUX_TEST_READY>");
+            // Establish actual prompt reports before attributing a later cd
+            // failure to moving. The general desktop fixture has no reporter.
+            await Program.Command(moved, "Set-Location -LiteralPath '" + directories[3].Replace("'", "''", StringComparison.Ordinal) + "'");
+            await Program.Until(() => Task.FromResult(moved.WorkingDirectory == directories[3]), "The pre-move integrated directory report was not ready.");
+            await Program.Command(moved, "Set-Location -LiteralPath '" + directories[1].Replace("'", "''", StringComparison.Ordinal) + "'");
+            await Program.Until(() => Task.FromResult(moved.WorkingDirectory == directories[1]), "The pre-move directory reset was not reported.");
             await Program.Until(async () => await browser.Core.ExecuteScriptAsync("document.querySelector('#page')?.textContent") == "\"/pane-detach\"", "The detach browser precondition was not ready.");
             var core = browser.Core;
             await core.ExecuteScriptAsync("window.paneDetachState = 41");
