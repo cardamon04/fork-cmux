@@ -5,7 +5,14 @@ const term = new Terminal({
   cursorBlink: true, scrollback: 5000, allowProposedApi: true,
   theme: { background: '#181a1f', foreground: '#dce1eb' },
 });
-const fit = new FitAddon.FitAddon();
+class BoundedFitAddon extends FitAddon.FitAddon {
+  proposeDimensions() {
+    const size = super.proposeDimensions();
+    // Match the native transport limit before changing the renderer grid.
+    return size && {cols: Math.min(1000, size.cols), rows: Math.min(1000, size.rows)};
+  }
+}
+const fit = new BoundedFitAddon();
 term.loadAddon(fit);
 term.loadAddon(new Unicode11Addon.Unicode11Addon());
 term.unicode.activeVersion = '11';
