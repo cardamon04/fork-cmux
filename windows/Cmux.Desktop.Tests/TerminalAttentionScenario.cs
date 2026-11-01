@@ -41,7 +41,7 @@ internal static class TerminalAttentionScenario
         var processes = new List<Process>();
         string? profile = null, browserProfile = null;
         void Track(TerminalPane pane) { var process = Process.GetProcessById(pane.ProcessId); _ = process.SafeHandle; processes.Add(process); }
-        async Task Bell(TerminalPane pane, Action beforeRelease, Func<bool>? focusReady = null)
+        async Task Bell(TerminalPane pane, Action beforeRelease, Func<bool>? focusReady = null, bool focusTextarea = false)
         {
             await Task.Delay(150); // Distinct BELs must outlive the renderer cooldown.
             var token = Guid.NewGuid().ToString("N");
@@ -55,8 +55,23 @@ internal static class TerminalAttentionScenario
             await Program.Contains(pane, "BEL_WAIT_" + token);
             beforeRelease();
             var target = window.Current?.Active;
-            await Program.Until(() => Task.FromResult(focusReady?.Invoke() ?? target?.ContainsFocus == true), "The owned target did not acquire native focus before releasing BEL.");
-            if (focusReady is null && target is TerminalPane terminal)
+            try { await Program.Until(() => Task.FromResult(focusReady?.Invoke() ?? target?.ContainsFocus == true), "The owned target did not acquire native focus before releasing BEL."); }
+            catch
+            {
+                var browser = target as BrowserPane;
+                var navigation = browser?.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
+                var address = navigation?.Items.OfType<ToolStripTextBox>().Single();
+                Console.WriteLine("ATTENTION_TARGET_FAILURE " + JsonSerializer.Serialize(new { shell,
+                    targetKind = target?.Kind.ToString(), currentKind = window.Current?.Active?.Kind.ToString(),
+                    targetStillActive = window.Current?.Active == target, target?.Visible, target?.Enabled,
+                    nativeFocus = target?.ContainsFocus, sourceFocus = pane.ContainsFocus, windowFocus = window.ContainsFocus,
+                    browserSource = browser?.Core.Source, navigationVisible = navigation?.Visible, navigationEnabled = navigation?.Enabled,
+                    addressVisible = address?.Visible, addressEnabled = address?.Enabled, addressOverflow = address?.IsOnOverflow,
+                    addressControlVisible = address?.Control.Visible, addressControlFocused = address?.Control.Focused,
+                    width = target?.Width, navigationWidth = navigation?.Width, addressWidth = address?.Width }));
+                throw;
+            }
+            if (focusTextarea && target is TerminalPane terminal)
             {
                 // A newly split WebView can own native focus before its DOM
                 // textarea has ever been focused. Establish that precondition
@@ -75,7 +90,7 @@ internal static class TerminalAttentionScenario
             var stable = window.Current == selectedBefore && selectedBefore?.Active == activeBefore
                 && (target?.ContainsFocus == true) == nativeBefore && domAfter == domBefore
                 && (focusReady?.Invoke() ?? true);
-            var evidence = JsonSerializer.Serialize(new { shell, nativeBefore, nativeAfter = target?.ContainsFocus == true,
+            var evidence = JsonSerializer.Serialize(new { shell, focusTextarea, nativeBefore, nativeAfter = target?.ContainsFocus == true,
                 domBefore, domAfter, selectionStable = window.Current == selectedBefore && selectedBefore?.Active == activeBefore, stable, unread = pane.HasUnread });
             Console.WriteLine("ATTENTION_DELIVERY " + evidence);
             Require(stable, "BEL changed the established logical/native/DOM focus: " + evidence);
@@ -102,13 +117,17 @@ internal static class TerminalAttentionScenario
 
             await Bell(first, () => second.FocusTerminal());
             await Program.Until(() => Task.FromResult(first.HasUnread), "A real background ConPTY BEL did not mark its pane unread.");
-            Require(window.Current == workspace && workspace.Active == second && second.ContainsFocus && await TextareaFocused(second), "Background BEL stole logical/native/DOM focus.");
+            Require(window.Current == workspace && workspace.Active == second && second.ContainsFocus, "Background BEL stole logical/native focus.");
             Require(first.BackColor == Color.Gold && Row(workspace) != plain && workspace.Title == plain && window.IsActionEnabled("NextUnread"), "The unread pane border/native row/action is missing, or its saved title changed.");
             Pass(passed, "terminal-attention-" + shell + "-inactive-pane-without-focus-theft");
 
             await window.ClickAction("NextUnread");
             await Program.Until(() => Task.FromResult(!first.HasUnread && workspace.Active == first && first.ContainsFocus), "Next unread did not focus and acknowledge the actual terminal.");
             Require(Row(workspace) == plain && first.BackColor == Color.CornflowerBlue && !window.IsActionEnabled("NextUnread"), "Acknowledgment left a stale native unread marker.");
+            await Bell(first, () => second.FocusTerminal(), focusTextarea: true);
+            Require(first.HasUnread && second.ContainsFocus && await TextareaFocused(second), "BEL changed an explicitly established textarea focus.");
+            await window.ClickAction("NextUnread");
+            Require(!first.HasUnread && workspace.Active == first, "The repeated unread target did not acknowledge.");
             await Bell(first, () => { });
             Require(!first.HasUnread && !window.IsActionEnabled("NextUnread"), "An actively focused terminal created unread attention.");
             Pass(passed, "terminal-attention-" + shell + "-navigation-acknowledgment-and-active-bell");
@@ -134,7 +153,7 @@ internal static class TerminalAttentionScenario
             window.SelectWorkspace(0);
             await Bell(first, () => window.SelectWorkspace(1));
             await Program.Until(() => Task.FromResult(first.HasUnread), "A hidden workspace BEL did not set unread.");
-            Require(window.Current == otherWorkspace && otherWorkspace.Active == other && other.ContainsFocus && await TextareaFocused(other), "A hidden workspace BEL selected or focused its owner.");
+            Require(window.Current == otherWorkspace && otherWorkspace.Active == other && other.ContainsFocus, "A hidden workspace BEL selected or focused its owner.");
             await window.ClickAction("NextUnread");
             Require(window.Current == workspace && workspace.Active == first && !first.HasUnread, "Next unread did not navigate across workspaces.");
             Require(!JsonSerializer.Serialize(window.CaptureSession()).Contains("Unread", StringComparison.Ordinal), "Unread attention expanded the saved session schema.");
