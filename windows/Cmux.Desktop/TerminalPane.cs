@@ -230,6 +230,11 @@ internal sealed class TerminalPane : WorkspacePane
     }
 
     internal void FocusTerminal() => FocusPane();
+    internal void ChangeFontSize(string action)
+    {
+        if (stopped || controller is null || !IsPage(Core.Source)) return;
+        Core.PostWebMessageAsJson(JsonSerializer.Serialize(new { kind = "fontSize", action }));
+    }
     internal void Find()
     {
         if (stopped || controller is null || !IsPage(Core.Source)) return;

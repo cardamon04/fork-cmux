@@ -62,7 +62,10 @@
     "MovePaneToNewWorkspace": "Move pane to new workspace",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "Stop",
-    "NavigationStopped": "Loading stopped."
+    "NavigationStopped": "Loading stopped.",
+    "IncreaseFontSize": "Increase font size",
+    "DecreaseFontSize": "Decrease font size",
+    "ResetFontSize": "Reset font size"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -127,7 +130,10 @@
     "MovePaneToNewWorkspace": "ペインを新しいワークスペースへ移動",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "停止",
-    "NavigationStopped": "読み込みを停止しました。"
+    "NavigationStopped": "読み込みを停止しました。",
+    "IncreaseFontSize": "文字を大きくする",
+    "DecreaseFontSize": "文字を小さくする",
+    "ResetFontSize": "文字サイズをリセット"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -192,7 +198,10 @@
     "MovePaneToNewWorkspace": "Bereich in neuen Arbeitsbereich verschieben",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "Stopp",
-    "NavigationStopped": "Laden angehalten."
+    "NavigationStopped": "Laden angehalten.",
+    "IncreaseFontSize": "Schrift vergrößern",
+    "DecreaseFontSize": "Schrift verkleinern",
+    "ResetFontSize": "Schriftgröße zurücksetzen"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -257,7 +266,10 @@
     "MovePaneToNewWorkspace": "Déplacer le volet vers un nouvel espace de travail",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "Arrêter",
-    "NavigationStopped": "Chargement arrêté."
+    "NavigationStopped": "Chargement arrêté.",
+    "IncreaseFontSize": "Agrandir le texte",
+    "DecreaseFontSize": "Réduire le texte",
+    "ResetFontSize": "Réinitialiser la taille du texte"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -322,7 +334,10 @@
     "MovePaneToNewWorkspace": "نقل الجزء إلى مساحة عمل جديدة",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "إيقاف",
-    "NavigationStopped": "تم إيقاف التحميل."
+    "NavigationStopped": "تم إيقاف التحميل.",
+    "IncreaseFontSize": "تكبير حجم الخط",
+    "DecreaseFontSize": "تصغير حجم الخط",
+    "ResetFontSize": "إعادة ضبط حجم الخط"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -387,7 +402,10 @@
     "MovePaneToNewWorkspace": "Mover panel a un nuevo espacio de trabajo",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "Detener",
-    "NavigationStopped": "Carga detenida."
+    "NavigationStopped": "Carga detenida.",
+    "IncreaseFontSize": "Aumentar el tamaño del texto",
+    "DecreaseFontSize": "Reducir el tamaño del texto",
+    "ResetFontSize": "Restablecer el tamaño del texto"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -452,7 +470,10 @@
     "MovePaneToNewWorkspace": "將窗格移至新工作區",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "停止",
-    "NavigationStopped": "已停止載入。"
+    "NavigationStopped": "已停止載入。",
+    "IncreaseFontSize": "放大字體",
+    "DecreaseFontSize": "縮小字體",
+    "ResetFontSize": "重設字體大小"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -517,7 +538,10 @@
     "MovePaneToNewWorkspace": "将窗格移至新工作区",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "停止",
-    "NavigationStopped": "已停止加载。"
+    "NavigationStopped": "已停止加载。",
+    "IncreaseFontSize": "放大字体",
+    "DecreaseFontSize": "缩小字体",
+    "ResetFontSize": "重置字体大小"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -582,6 +606,9 @@
     "MovePaneToNewWorkspace": "패널을 새 작업 공간으로 이동",
     "TerminalWindowTitle": "{0} — cmux Windows",
     "Stop": "중지",
-    "NavigationStopped": "로드를 중지했습니다."
+    "NavigationStopped": "로드를 중지했습니다.",
+    "IncreaseFontSize": "글꼴 크기 늘리기",
+    "DecreaseFontSize": "글꼴 크기 줄이기",
+    "ResetFontSize": "글꼴 크기 초기화"
   }
 }

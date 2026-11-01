@@ -26,7 +26,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-018 | F-09 | その他の本家エージェント・チャット連携 | [CmuxAgentChat](../Packages/Shared/CmuxAgentChat/)、[agent-messages](agent-messages.md) | 提供元と対応機能を列挙する必要あり |
 | WIN-019 | F-10 | レイアウト・CWD・履歴・ブラウザ状態の保存と復元 | [SessionPersistence](../Sources/SessionPersistence.swift)、[agent-recovery](agent-recovery.md) | 部分実装。[Windowsアプリ](../windows/README.md)で終了時保存・次回起動時復元、混在分割・比率・選択・PowerShellのローカルcd後のディレクトリ・ブラウザURLに対応。保存項目は既存Directoryのままでコマンド/出力/履歴を追加保存しない。履歴・スクロールバック、ブラウザ履歴・ログイン状態、クラッシュ復旧等は未対応。F-10全体の合格ではない |
 | WIN-020 | F-10 | 実行中プロセスの維持、再接続、エージェント再開 | [CmuxAgentSessionStore](../Packages/macOS/CmuxAgentSessionStore/)、[agent-recovery](agent-recovery.md) | 未実装 |
-| WIN-021 | F-11 | Ghostty設定、フォント、テーマ、色、設定再読み込み | [configuration](configuration.md)、[CmuxSettings](../Packages/macOS/CmuxSettings/) | 設定キーごとの互換表が必要 |
+| WIN-021 | F-11 | Ghostty設定、フォント、テーマ、色、設定再読み込み | [configuration](configuration.md)、[CmuxSettings](../Packages/macOS/CmuxSettings/) | 選択端末の文字サイズ増減・リセットを実装。pane ごとの一時 zoom（6〜72 CSS px、初期値14）と既存 ConPTY resize 経路を使用。両 PowerShell の実 grid・入力保持・pane/workspace/browser 分離・移動を hosted CI で検証する。対象 PC GUI は待機。永続設定・Ghostty 設定互換・フォント選択・テーマ/色・再読み込みは未実装 |
 | WIN-022 | F-11 | Windows向けキー割り当て、変更、カスタムコマンド、補完 | [ghostty-keybindings](ghostty-keybindings.md)、[configuration](configuration.md) | Ctrl+Cなどの通常操作とIMEを含めて検証する必要あり |
 | WIN-023 | F-12 | 本家クラウドの認証、マシン、端末、ブラウザ | [CmuxCloud](../Packages/macOS/CmuxCloud/)、[CmuxCloudMachines](../Packages/macOS/CmuxCloudMachines/)、[CMUXAuthCore](../Packages/Shared/CMUXAuthCore/) | Windowsからの認証・接続は未検証。対象に維持 |
 | WIN-024 | F-13 | 公式iPhoneのペアリング、端末操作、通知、再接続 | [CmuxIrohTransport](../Packages/Shared/CmuxIrohTransport/)、[iroh-offline-pairing](iroh-offline-pairing-v1.md)、[iOS](../ios/) | 実機・アカウントでの接続は未検証。対象に維持 |

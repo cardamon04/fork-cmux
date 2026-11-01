@@ -88,8 +88,10 @@ internal static class TerminalFontSizeScenario
             first.FocusTerminal();
             await window.ClickAction("MovePaneToNewWorkspace");
             Require(window.Current!.Active == first && (await Size(first)).Font == 24, "Moving a live pane replaced its font size or identity.");
+            window.SelectWorkspace(0);
             second.FocusTerminal();
             Require((await Size(second)).Font == 14, "Workspace switching leaked the selected font size.");
+            window.SelectWorkspace(1);
             first.FocusTerminal();
             Pass(passed, "terminal-font-size-pane-workspace-browser-isolation-" + shell);
 
