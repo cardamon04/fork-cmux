@@ -478,7 +478,8 @@ internal sealed class DesktopWindow : Form
 
     private static void DetachPane(PaneLocation location)
     {
-        location.Panel.Controls.Remove(location.Pane);
+        // The removed split still owns the pane until a live destination
+        // adopts it, or ClosePane disposes that split and its child controls.
         location.Sibling.Parent!.Controls.Remove(location.Sibling);
         location.Parent.Controls.Remove(location.Split);
         location.Parent.Controls.Add(location.Sibling);
