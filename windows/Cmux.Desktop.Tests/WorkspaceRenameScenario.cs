@@ -40,6 +40,7 @@ internal static class WorkspaceRenameScenario
             Track(first);
             await Regression(first, passed);
             await CaseOnly(first, passed);
+            await ProjectionFailure(first, passed);
             var workspace = first.Current!;
             var pane = workspace.Active;
             var original = workspace.Title;
@@ -94,18 +95,44 @@ internal static class WorkspaceRenameScenario
             Console.WriteLine("RENAME_CANCEL_SELECTION " + JsonSerializer.Serialize(new { Selected = first.Current == other, Browser = other.Active == browserPane, Focus = browserPane!.ContainsFocus }));
             await Program.Until(() => Task.FromResult(first.Current == other && other.Active == browserPane && browserPane!.ContainsFocus), "Cancel did not return logical focus to the newly selected browser pane.");
             first.SelectWorkspace(0);
-            const string selectedElsewhere = "  pinned 日本語😀 ; $() & <literal>  ";
+            const string selectedElsewhere = "  PROJECT 日本語😀 ; $() & <literal>  ";
+            var terminal = (TerminalPane)pane!;
+            var gate = Path.Combine(directory, "unread-rename-gate");
+            await Program.Command(terminal, "Write-Output ('CASE_'+'WAITING'); while (!(Test-Path -LiteralPath '"
+                + gate.Replace("'", "''", StringComparison.Ordinal) + "')) { Start-Sleep -Milliseconds 10 }; [Console]::Write([char]7)");
+            await Program.Contains(terminal, "CASE_WAITING");
+            Exception? bellFailure = null;
             await Edit(first, () => { _ = first.ClickAction("RenameWorkspace"); }, dialog =>
             {
                 Input(dialog).Text = selectedElsewhere;
                 first.SelectWorkspace(1);
+                using var barrier = new Form { ShowInTaskbar = false };
+                barrier.Shown += async (_, _) =>
+                {
+                    try
+                    {
+                        File.WriteAllText(gate, "release");
+                        await Program.Until(() => Task.FromResult(terminal.HasUnread), "The real BEL did not mark the captured rename target unread.");
+                    }
+                    catch (Exception error) { bellFailure = error; }
+                    finally { barrier.Close(); }
+                };
+                barrier.ShowDialog(dialog);
+                Require(bellFailure is null && terminal.HasUnread, "The case-only rename fixture did not establish an unread background target.");
+                Require(NativeTitle(first, 0) == new Strings().Format("UnreadWorkspace", literal), "The real BEL did not decorate the old native name.");
                 Console.WriteLine("RENAME_BEFORE_CONFIRM " + JsonSerializer.Serialize(new { Selected = first.Current == other, Browser = other.Active == browserPane }));
                 Button(dialog, "Confirm").PerformClick();
             });
             Console.WriteLine("RENAME_AFTER_CONFIRM " + JsonSerializer.Serialize(new { Target = workspace.Title == selectedElsewhere, Other = other.Title == literal, Selected = first.Current == other, Browser = other.Active == browserPane }));
             Require(workspace.Title == selectedElsewhere && other.Title == literal && first.Current == other && other.Active == browserPane,
                 "A changed selection redirected rename or lost the browser pane.");
-            Require(NativeTitle(first, 0) == selectedElsewhere && NativeTitle(first, 1) == literal, "Sidebar refresh lost a selected identity or title.");
+            Require(terminal.HasUnread && NativeTitle(first, 0) == new Strings().Format("UnreadWorkspace", selectedElsewhere)
+                && NativeTitle(first, 1) == literal && browserPane!.ContainsFocus, "Case-only rename lost native casing, unread decoration or the other selected pane.");
+            first.SelectWorkspace(0);
+            await Program.Until(() => Task.FromResult(!terminal.HasUnread), "Viewing the renamed target did not acknowledge its BEL.");
+            Require(NativeTitle(first, 0) == selectedElsewhere, "Acknowledging unread lost the exact renamed native title.");
+            first.SelectWorkspace(1);
+            Pass("workspace-rename-case-only-captured-unread-target-and-acknowledgment");
             Pass("workspace-rename-duplicates-browser-and-captured-target-isolation");
 
             await first.ClickAction("SaveSession");
@@ -115,8 +142,10 @@ internal static class WorkspaceRenameScenario
             Require(!File.ReadAllText(path).Contains("AFTER_RENAME_ALIVE", StringComparison.Ordinal), "Renaming expanded terminal output persistence.");
             Pass("workspace-rename-explicit-save-uses-existing-title-field");
 
-            const string last = "ブラウザ overview & final";
+            await Rename(first, "ブラウザ overview & final");
+            const string last = "ブラウザ OVERVIEW & FINAL";
             await Rename(first, last);
+            Require(NativeTitle(first, 1) == last, "The selected browser workspace kept its old native casing.");
             await Close(first);
             restored.Show();
             await restored.Started.WaitAsync(TimeSpan.FromSeconds(30));
@@ -138,6 +167,7 @@ internal static class WorkspaceRenameScenario
                 Capture(restored.Controls.OfType<ListBox>().Single(), artifacts, "workspace-renamed-sidebar");
             }
             Pass("workspace-rename-normal-close-restores-titles-and-browser-selection");
+            Pass("workspace-rename-case-only-explicit-save-and-normal-close-reopen");
             await restored.ClickAction("CloseWorkspace");
             await restored.ClickAction("CloseWorkspace");
             Require(restored.Current is null && !restored.IsActionEnabled("RenameWorkspace"), "Rename remained enabled with no workspace.");
@@ -251,6 +281,37 @@ internal static class WorkspaceRenameScenario
         Require(workspace.Title == lower && NativeTitle(window) == lower, "A case-only row rename left a stale native workspace label.");
         Require(window.Current == workspace && workspace.Active == pane && pane.ContainsFocus, "Case-only renaming changed the selected live pane.");
         passed.Add("workspace-rename-case-only-toolbar-and-row-native-label");
+        Console.WriteLine("passed: " + passed[^1]);
+    }
+
+    private static async Task ProjectionFailure(DesktopWindow window, List<string> passed)
+    {
+        var workspace = window.Current!;
+        var pane = workspace.Active!;
+        var identities = window.Workspaces.ToArray();
+        var sidebar = window.Controls.OfType<ListBox>().Single();
+        const string title = "CASE 日本語😀 & project";
+        const string fault = "OWNED_RENAME_FORMAT_FAILURE";
+        var attempts = 0;
+        ListControlConvertEventHandler fail = (_, args) =>
+        {
+            if (args.ListItem == workspace && workspace.Title == title)
+            {
+                attempts++;
+                throw new InvalidOperationException(fault);
+            }
+        };
+        sidebar.Format += fail;
+        try { await Rename(window, title); }
+        finally { sidebar.Format -= fail; }
+        Require(attempts == 1 && window.LastError == fault, "The owned native projection failure did not reach the action error path exactly once.");
+        Require(window.Workspaces.SequenceEqual(identities) && window.Current == workspace && workspace.Active == pane
+            && !workspace.IsDisposed && !pane.IsDisposed, "A failed native title projection removed or replaced the live workspace.");
+        await Rename(window, title);
+        Require(workspace.Title == title && NativeTitle(window) == title && pane.ContainsFocus, "Renaming could not recover after an owned projection failure.");
+        await Program.Command((TerminalPane)pane, "Write-Output ('CASE_FAILURE_'+'ALIVE')");
+        await Program.Contains((TerminalPane)pane, "CASE_FAILURE_ALIVE");
+        passed.Add("workspace-rename-projection-failure-retains-live-workspace-and-retry");
         Console.WriteLine("passed: " + passed[^1]);
     }
 

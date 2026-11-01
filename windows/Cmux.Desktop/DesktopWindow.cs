@@ -304,7 +304,14 @@ internal sealed class DesktopWindow : Form
         if (result != DialogResult.OK || shuttingDown || closingWindow
             || !Workspaces.Contains(workspace)) return Task.CompletedTask;
         if (!workspace.TryRename(dialog.WorkspaceName)) throw new InvalidOperationException(strings.Format("WorkspaceNameInvalid", WorkspaceTitle.MaxCharacters));
-        RefreshSidebar(() => sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace);
+        RefreshSidebar(() =>
+        {
+            var index = sidebar.Items.IndexOf(workspace);
+            // Item assignment can keep the old native text for case-only changes.
+            // Insert first so a failed projection cannot remove the live workspace.
+            sidebar.Items.Insert(index, workspace);
+            sidebar.Items.RemoveAt(index + 1);
+        });
         return Task.CompletedTask;
     }
 
