@@ -27,6 +27,16 @@ internal static class BrowserStopScenario
                 Require(!loading.Completed.IsCompleted && browser.IsNavigationEnabled("Stop"), "The owned request was not pending with Stop available.");
                 browser.ClickNavigation("Stop");
                 var result = await loading.Completed.WaitAsync(TimeSpan.FromSeconds(20));
+                string? source = null;
+                string? sourceError = null;
+                try { source = browser.Core.Source; }
+                catch (Exception error) { sourceError = error.GetType().Name; }
+                Console.WriteLine("BROWSER_STOP_COMPLETION " + JsonSerializer.Serialize(new
+                {
+                    result.Success, error = result.Error.ToString(), code = (int)result.Error,
+                    navigationId = loading.Id, status = browser.StatusText,
+                    stopEnabled = browser.IsNavigationEnabled("Stop"), source, sourceError,
+                }));
                 Require(!result.Success && result.Error == CoreWebView2WebErrorStatus.OperationCanceled, "Stop did not cancel the actual engine navigation.");
                 Require(!browser.IsNavigationEnabled("Stop") && browser.StatusText == new Strings()["NavigationStopped"], "Canceled loading retained the loading state.");
                 var input = JsonSerializer.Deserialize<string>(await browser.Core.ExecuteScriptAsync("document.querySelector('#name').value"));
@@ -101,6 +111,7 @@ internal static class BrowserStopScenario
         private readonly TaskCompletionSource<(bool Success, CoreWebView2WebErrorStatus Error)> completed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private ulong? id;
         internal Task<(bool Success, CoreWebView2WebErrorStatus Error)> Completed => completed.Task;
+        internal ulong? Id => id;
         internal Navigation(BrowserPane pane)
         {
             core = pane.Core;
