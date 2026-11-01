@@ -74,6 +74,9 @@ internal sealed class DesktopWindow : Form
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
+        AddAction("IncreaseFontSize", () => ChangeFontSize("increase"));
+        AddAction("DecreaseFontSize", () => ChangeFontSize("decrease"));
+        AddAction("ResetFontSize", () => ChangeFontSize("reset"));
         var footer = new StatusStrip { ShowItemToolTips = true };
         footer.Items.Add(status);
         footer.Items.Add(directoryStatus);
@@ -104,12 +107,20 @@ internal sealed class DesktopWindow : Form
 
     internal bool IsActionEnabled(string key) => toolbar.Enabled && toolbar.Items[key]!.Enabled;
 
+    private Task ChangeFontSize(string action)
+    {
+        (Current?.Active as TerminalPane)?.ChangeFontSize(action);
+        return Task.CompletedTask;
+    }
+
     private void UpdateActions()
     {
         var allowed = Current?.Active?.SupportsClipboard == true;
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
+        foreach (var key in new[] { "IncreaseFontSize", "DecreaseFontSize", "ResetFontSize" })
+            toolbar.Items[key]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
@@ -538,6 +549,9 @@ internal sealed class DesktopWindow : Form
     {
         if (Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
         var location = LocatePane(workspace, pane);
+        // The hidden destination has a temporary small size while reparenting.
+        // Publish only the committed or restored viewport to the live ConPTY.
+        using var viewport = (pane as TerminalPane)?.DeferViewportLayout();
         var sequence = workspaceSequence + 1;
         var destination = new WorkspaceView(strings.Format("Workspace", sequence)) { Dock = DockStyle.Fill, Visible = false };
         var previousFence = selectingWorkspace;
