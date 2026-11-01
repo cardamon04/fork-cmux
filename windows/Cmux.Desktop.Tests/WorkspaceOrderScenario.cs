@@ -152,7 +152,7 @@ internal static class WorkspaceOrderScenario
             Console.WriteLine("ORDER_SAVE_TRACE " + JsonSerializer.Serialize(new { saved, seedLayouts = snapshot.Workspaces.Select(item => item.Layout), initialLayouts,
                 selectedStillBrowser = selected.Active == browser, currentStillSelected = window.Current == selected }));
             Require(saved.Version == 1 && saved.WorkspaceSequence == 3 && saved.SelectedWorkspace == 2
-                && saved.Workspaces.Select(item => item.Layout).SequenceEqual(new[] { snapshot.Workspaces[0].Layout, snapshot.Workspaces[2].Layout, snapshot.Workspaces[1].Layout }),
+                && saved.Workspaces.Select(item => item.Layout).SequenceEqual(new[] { initialLayouts[0], initialLayouts[2], initialLayouts[1] }),
                 "Explicit save lost workspace order, current selection or nested data.");
             Require(!File.ReadAllText(path).Contains("SYNTHETIC_BROWSER_STATE", StringComparison.Ordinal)
                 && !File.ReadAllText(path).Contains("ORDER_TERMINAL_LIVE", StringComparison.Ordinal), "Reordering expanded storage to output or browser memory.");
@@ -174,7 +174,7 @@ internal static class WorkspaceOrderScenario
             await closed.WaitAsync(TimeSpan.FromSeconds(30));
             Require(processes.Values.All(process => process.WaitForExit(0)), "An original ordered shell survived normal close.");
             var normal = JsonSerializer.Deserialize<SessionSnapshot>(File.ReadAllText(path))!;
-            Require(normal.SelectedWorkspace == 0 && normal.Workspaces.Select(item => item.Layout).SequenceEqual(new[] { snapshot.Workspaces[1].Layout, snapshot.Workspaces[0].Layout, snapshot.Workspaces[2].Layout }),
+            Require(normal.SelectedWorkspace == 0 && normal.Workspaces.Select(item => item.Layout).SequenceEqual(new[] { initialLayouts[1], initialLayouts[0], initialLayouts[2] }),
                 "Normal close did not save the latest order/selection.");
             Pass("workspace-order-normal-close-saves-latest-order", passed);
 
