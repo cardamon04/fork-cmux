@@ -27,7 +27,7 @@ internal static class WorkspaceOrderScenario
             var selected = window.Current!;
             var active = selected.Active;
             var button = window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip).Items["MoveWorkspaceUp"] as ToolStripButton;
-            Require(button is { Enabled: true }, "The selected workspace has no usable move-up action.");
+            if (button is not { Enabled: true }) throw new InvalidOperationException("The selected workspace has no usable move-up action.");
             button.PerformClick();
             await window.PendingAction;
             Require(window.Workspaces.SequenceEqual(new[] { before[0], before[2], before[1] }), "Move up did not reorder the native sidebar workspace objects.");
