@@ -410,7 +410,9 @@ internal sealed class DesktopWindow : Form
             workspace.Controls.Add(tree);
             workspace.Active = workspace.Panes[item.ActivePane];
         }
-        foreach (var workspace in Workspaces)
+        // Starting panes yields to unread-row refreshes, which version the
+        // native list even when workspace identities remain unchanged.
+        foreach (var workspace in Workspaces.ToArray())
         {
             // ConPTY must start with the measured renderer dimensions. Hidden
             // Dock controls have not been laid out and can report a tiny grid.
