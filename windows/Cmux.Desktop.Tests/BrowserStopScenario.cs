@@ -13,7 +13,7 @@ internal static class BrowserStopScenario
         var process = terminal.ProcessId;
         await window.ClickAction("OpenBrowser");
         var browser = (BrowserPane)window.Current.Active!;
-        Require(browser.Controls.OfType<ToolStrip>().Single().Items["Stop"] is ToolStripButton,
+        Require(browser.Controls.OfType<ToolStrip>().Single(strip => strip is not StatusStrip).Items["Stop"] is ToolStripButton,
             "The browser has no user action to stop an in-flight page load.");
         Require(!browser.IsNavigationEnabled("Stop"), "Stop was enabled for the idle initial document.");
         try
