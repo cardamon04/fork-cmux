@@ -56,6 +56,8 @@ internal static class UnicodeInputScenario
         {
             await using var fixture = new Fixture(source, shell.Executable);
             await fixture.Start();
+            var version = await fixture.Frame("$PSVersionTable.PSVersion.ToString()");
+            Require(version.StartsWith(shell.Name == "pwsh" ? "7." : "5.1", StringComparison.Ordinal), "The Unicode matrix selected the wrong PowerShell runtime.");
             var value = "日本語🍀😀𝄞e\u0301";
             await fixture.Command("$global:__cmuxUnicodeValue='" + value + "'");
             var actualValue = await fixture.Frame("$global:__cmuxUnicodeValue");
