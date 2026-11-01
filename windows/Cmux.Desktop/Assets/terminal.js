@@ -12,7 +12,7 @@ term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
 let win32Input = false;
 // ConPTY requests native key records with DECSET 9001. xterm still handles
-// other modes in the same sequence; only supplementary text needs adaptation.
+// other modes in the same sequence; non-ASCII text can need lossless records.
 for (const [final, enabled] of [['h', true], ['l', false]]) {
   term.parser.registerCsiHandler({prefix:'?', final}, params => {
     if (params.includes(9001)) win32Input = enabled;
