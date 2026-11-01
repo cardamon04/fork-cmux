@@ -215,7 +215,7 @@ internal static class WorkspaceOrderScenario
         }
     }
 
-    private static string[] NativeNames(DesktopWindow window)
+    internal static string[] NativeNames(DesktopWindow window)
     {
         var list = window.Controls.OfType<ListBox>().Single();
         GetWindowThreadProcessId(list.Handle, out var owner);

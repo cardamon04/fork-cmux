@@ -62,6 +62,7 @@ internal static class Program
         var unicodeOnly = args.Length > 0 && args[0] == "--unicode-input-only";
         var titleOnly = args is ["--terminal-title-only"];
         var fontSizeOnly = args.Length > 0 && args[0] == "--terminal-font-size-only";
+        var attentionOnly = args is ["--terminal-attention-only"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -100,6 +101,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (attentionOnly)
+                {
+                    await TerminalAttentionScenario.Run(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Terminal attention reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (fontSizeOnly)
                 {
                     await TerminalFontSizeScenario.Run(shell, passed, args.ElementAtOrDefault(1));
@@ -472,6 +481,7 @@ internal static class Program
                 await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalFontSizeScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await TerminalAttentionScenario.Run(shell, passed);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));

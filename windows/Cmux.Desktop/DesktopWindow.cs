@@ -29,6 +29,7 @@ internal sealed class DesktopWindow : Form
     private bool selectingWorkspace;
     private bool editingWorkspaceTitle;
     private bool closingWindow;
+    private bool windowActive;
     private int workspaceSequence;
     internal Task Started => started.Task;
     internal WorkspaceView? Current => sidebar.SelectedItem as WorkspaceView;
@@ -52,6 +53,13 @@ internal sealed class DesktopWindow : Form
         sidebar.BackColor = Color.FromArgb(32, 35, 43);
         sidebar.ForeColor = Color.WhiteSmoke;
         sidebar.BorderStyle = BorderStyle.None;
+        sidebar.FormattingEnabled = true;
+        sidebar.Format += (_, e) =>
+        {
+            if (e.ListItem is WorkspaceView workspace)
+                e.Value = workspace.Panes.OfType<TerminalPane>().Any(pane => pane.HasUnread)
+                    ? strings.Format("UnreadWorkspace", workspace.Title) : workspace.Title;
+        };
         sidebar.SelectedIndexChanged += (_, _) => SelectWorkspace();
         sidebar.MouseDoubleClick += (_, e) =>
         {
@@ -74,6 +82,7 @@ internal sealed class DesktopWindow : Form
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
+        AddAction("NextUnread", NextUnread);
         AddAction("IncreaseFontSize", () => ChangeFontSize("increase"));
         AddAction("DecreaseFontSize", () => ChangeFontSize("decrease"));
         AddAction("ResetFontSize", () => ChangeFontSize("reset"));
@@ -89,6 +98,8 @@ internal sealed class DesktopWindow : Form
         Controls.Add(footer);
         status.Text = strings["Starting"];
         Shown += (_, _) => initialize = Initialize();
+        Activated += (_, _) => { windowActive = true; AcknowledgeCurrent(); };
+        Deactivate += (_, _) => windowActive = false;
         FormClosing += CloseWindow;
     }
 
@@ -119,6 +130,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
+        toolbar.Items["NextUnread"]!.Enabled = Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().Any(pane => pane.HasUnread);
         foreach (var key in new[] { "IncreaseFontSize", "DecreaseFontSize", "ResetFontSize" })
             toolbar.Items[key]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
@@ -138,6 +150,66 @@ internal sealed class DesktopWindow : Form
             var caption = TerminalTitle.Caption(strings, (Current?.Active as TerminalPane)?.Title);
             if (Text != caption) Text = caption;
         }
+    }
+
+    private void TerminalBell(TerminalPane pane)
+    {
+        if (shuttingDown || closingWindow || pane.IsDisposed || pane.HasUnread) return;
+        // Look up the live owner: this pane may have moved since subscription.
+        var owner = Workspaces.FirstOrDefault(workspace => workspace.Panes.Contains(pane));
+        if (owner is null || (windowActive && Current == owner && owner.Active == pane && pane.ContainsFocus)) return;
+        pane.HasUnread = true;
+        RefreshAttention(owner);
+    }
+
+    private void AcknowledgeCurrent()
+    {
+        if (windowActive && Current is { Active: TerminalPane { HasUnread: true } pane } workspace && pane.ContainsFocus)
+        {
+            pane.HasUnread = false;
+            RefreshAttention(workspace);
+        }
+    }
+
+    private static void PaintPaneBorders(WorkspaceView workspace)
+    {
+        foreach (var pane in workspace.Panes)
+            pane.BackColor = pane is TerminalPane { HasUnread: true } ? Color.Gold
+                : pane == workspace.Active ? Color.CornflowerBlue : Color.FromArgb(24, 26, 31);
+    }
+
+    private void RefreshAttention(WorkspaceView workspace)
+    {
+        var index = sidebar.Items.IndexOf(workspace);
+        if (index < 0) return;
+        var selected = Current;
+        var previousFence = selectingWorkspace;
+        selectingWorkspace = true;
+        sidebar.BeginUpdate();
+        try
+        {
+            // Refresh the native accessible row text without selecting/focusing
+            // the pane that rang. Renaming still uses its existing focus path.
+            sidebar.Items[index] = workspace;
+            sidebar.SelectedItem = selected;
+        }
+        finally { sidebar.EndUpdate(); selectingWorkspace = previousFence; }
+        PaintPaneBorders(workspace);
+        UpdateActions();
+    }
+
+    private Task NextUnread()
+    {
+        foreach (var workspace in Workspaces)
+        {
+            var pane = workspace.Panes.OfType<TerminalPane>().FirstOrDefault(item => item.HasUnread);
+            if (pane is null) continue;
+            ActivatePane(workspace, pane);
+            sidebar.SelectedItem = workspace;
+            SelectWorkspace();
+            break;
+        }
+        return Task.CompletedTask;
     }
 
     private static void SetStatusText(ToolStripStatusLabel label, string text)
@@ -426,6 +498,7 @@ internal sealed class DesktopWindow : Form
             terminal.WorkingDirectoryChanged += () => { if (Current?.Active == terminal) UpdateActions(); };
             // Title arrival is display-only. Never project focus or selection.
             terminal.TitleChanged += () => { if (Current?.Active == terminal) UpdateCaption(); };
+            terminal.Bell += () => TerminalBell(terminal);
         }
         workspace.Panes.Add(pane);
         return pane;
@@ -445,8 +518,8 @@ internal sealed class DesktopWindow : Form
         if (!workspace.Panes.Contains(pane)) return;
         if (workspace.Active != pane) workspace.SelectionRevision++;
         workspace.Active = pane;
-        foreach (var item in workspace.Panes)
-            item.BackColor = item == pane ? Color.CornflowerBlue : Color.FromArgb(24, 26, 31);
+        AcknowledgeCurrent();
+        PaintPaneBorders(workspace);
         UpdateActions();
     }
 
@@ -587,6 +660,7 @@ internal sealed class DesktopWindow : Form
             SelectWorkspace();
         }
         location.Split.Dispose();
+        RefreshAttention(workspace);
         if (pane is BrowserPane browser) browser.FocusAddress();
         return Task.CompletedTask;
     }
@@ -601,6 +675,7 @@ internal sealed class DesktopWindow : Form
         await pane.DisposeAsync();
         location.Split.Dispose();
         workspace.Active.FocusPane();
+        RefreshAttention(workspace);
         UpdateActions();
     }
 

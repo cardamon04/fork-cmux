@@ -22,6 +22,8 @@ internal sealed class TerminalPane : WorkspacePane
     private readonly TerminalTitle title = new();
     internal string Title => title.Value;
     internal event Action? TitleChanged;
+    internal event Action? Bell;
+    internal bool HasUnread;
     private string? pendingDirectory;
     private string? lastDirectoryReport;
     private long directoryRevision;
@@ -167,6 +169,7 @@ internal sealed class TerminalPane : WorkspacePane
                     break;
                 case "focus": if (ContainsFocus) NotifyActivated(); break;
                 case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
+                case "bell": Bell?.Invoke(); break;
                 case "title":
                     if (root.TryGetProperty("data", out var titleValue) && titleValue.ValueKind == JsonValueKind.String
                         && title.Update(titleValue.GetString())) TitleChanged?.Invoke();

@@ -12,7 +12,7 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-004 | F-02 | WSL2上の端末アプリの操作 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/) | WSL固有の起動・作業先・パス変換を検証する必要あり |
 | WIN-005 | F-02 | スクロール、検索、選択、コピー・貼り付け、マウス、画像 | [CmuxTerminal](../Packages/macOS/CmuxTerminal/)、[CmuxTerminalCore](../Packages/macOS/CmuxTerminalCore/) | スクロール・選択・コピー/貼り付けに加え、ペイン内の文字列検索・前後移動・大文字小文字切替を実装。実PowerShell出力・スクロールバック・Unicode・折り返し・該当なし・選択コピー・ワークスペース分離・終了・上限を検証。正規表現・全ペイン検索・検索キー設定・OSクリップボード・画像・Ghosttyとの差は未検証/未実装 |
 | WIN-006 | F-03 | CWD、Git、PR、待受ポート、最新通知の表示 | [README](../README.md)、[CmuxWorkspaces](../Packages/macOS/CmuxWorkspaces/) | 部分実装。両PowerShellでローカルCWD追跡・表示・分割継承と、選択ペインのGit branch/切り離されたHEAD表示を実装。branch変更・unborn/linked worktree・nativeのliteral描画・pane/workspace/browser分離・不正HEAD/管理外の消去・保存範囲/通常終了を検証。Git読取はUI外で実行し、所有local promisorの失敗回帰からlazy fetchを禁止。既存prompt/終了状態とCWDの不正/リモート/junction拒否の回帰も維持。dirty状態・PR・ポート・通知、WSL/SSHは未対応 |
-| WIN-007 | F-04 | 通知の受信、未読、ペイン強調、一覧、移動 | [TerminalNotificationStore](../Sources/TerminalNotificationStore.swift)、[CmuxNotifications](../Packages/macOS/CmuxNotifications/) | 未実装 |
+| WIN-007 | F-04 | 通知の受信、未読、ペイン強調、一覧、移動 | [TerminalNotificationStore](../Sources/TerminalNotificationStore.swift)、[CmuxNotifications](../Packages/macOS/CmuxNotifications/) | 端末BELによるin-app未読・pane強調・次の未読paneへの移動を部分実装。実parserと両PowerShell/所有hosted GUIでframing・focus非干渉・移動/終了時owner・一時状態を検証する。OSCのBEL終端は除外、floodはrendererごとに抑制。実PCは未検証。hook/CLI受信・通知一覧・OS toast/音・phone転送は未実装 |
 | WIN-008 | F-04 | Windowsのデスクトップ通知 | [CmuxNotifications](../Packages/macOS/CmuxNotifications/) | OS向け実装と通知からの復帰を要検証 |
 | WIN-009 | F-05 | CLIコマンド・入出力・エラーの互換 | [cli-contract](cli-contract.md)、[command tree](cli-command-tree.txt)、[CLI](../CLI/) | コマンド単位の対照表へ展開する必要あり |
 | WIN-010 | F-05 | API、識別子、認可、PowerShell・WSL2・SSHからの操作 | [CmuxControlSocket](../Packages/macOS/CmuxControlSocket/) | 通信方式・認可境界を設計する必要あり |
@@ -36,3 +36,5 @@ Windows製品は実装途中です。[デスクトップ](../windows/README.md)�
 | WIN-028 | F-16 | Feed、automations、computer useなどの追加機能 | [feed](feed.md)、[automations](automations.md)、[computer-use](computer-use.md) | 対象を落とさず、実装と利用条件を調査する必要あり |
 
 最新の追加機能と未調査領域は[差分追跡手順](windows-development.md)に従って追加します。全行を合格にするだけでなく、一覧自体の網羅性を本家のCLI・API・設定・文書・テストに照らして確認することが完成条件です。
+
+Draft群の到達点、既知不具合、仕様回答待ちと未検証の区別は[実装状況](windows-implementation-status.md)にまとめます。

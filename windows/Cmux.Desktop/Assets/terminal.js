@@ -46,6 +46,14 @@ function queueTitle(data) {
   }, 100);
 }
 term.onTitleChange(queueTitle);
+let bellTimer = null;
+term.onBell(() => {
+  if (bellTimer !== null) return;
+  // Deliver the first BEL immediately. A bounded leading-edge cooldown avoids
+  // floods without publishing a stale trailing BEL after focus changes.
+  send({kind:'bell'});
+  bellTimer = setTimeout(() => { bellTimer = null; }, 100);
+});
 // ConPTY requests native key records with DECSET 9001. xterm still handles
 // other modes in the same sequence; non-ASCII text can need lossless records.
 for (const [final, enabled] of [['h', true], ['l', false]]) {
