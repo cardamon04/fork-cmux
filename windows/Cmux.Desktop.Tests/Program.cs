@@ -35,6 +35,7 @@ internal static class Program
         var gitRender = args is ["--git-render-regression"];
         var gitWorker = args is ["--git-worker-regression"];
         var orderRegression = args is ["--workspace-order-regression"];
+        var orderOnly = args.Length > 0 && args[0] == "--workspace-order-only";
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -73,6 +74,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (orderOnly)
+                {
+                    await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(1));
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Workspace ordering reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (orderRegression)
                 {
                     await WorkspaceOrderScenario.Regression(shell, passed);
@@ -372,6 +381,7 @@ internal static class Program
                 await SessionRegressionScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await GitStatusScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
