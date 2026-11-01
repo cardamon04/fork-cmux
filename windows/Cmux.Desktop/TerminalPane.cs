@@ -32,6 +32,7 @@ internal sealed class TerminalPane : WorkspacePane
     private TaskCompletionSource? ack;
     private long sequence;
     private bool stopped;
+    private int viewportDeferrals;
     internal override CoreWebView2 Core => controller!.CoreWebView2;
     internal override PaneKind Kind => PaneKind.Terminal;
     internal override bool SupportsClipboard => true;
@@ -53,9 +54,27 @@ internal sealed class TerminalPane : WorkspacePane
 
     private void UpdateControllerBounds()
     {
-        if (controller is not null)
+        if (controller is not null && viewportDeferrals == 0)
             controller.Bounds = new Rectangle(Padding.Left, Padding.Top,
                 Math.Max(1, ClientSize.Width - Padding.Horizontal), Math.Max(1, ClientSize.Height - Padding.Vertical));
+    }
+
+    internal IDisposable DeferViewportLayout()
+    {
+        viewportDeferrals++;
+        return new ViewportLayout(this);
+    }
+
+    private sealed class ViewportLayout(TerminalPane pane) : IDisposable
+    {
+        private TerminalPane? owner = pane;
+        public void Dispose()
+        {
+            if (owner is not { } current) return;
+            owner = null;
+            current.viewportDeferrals--;
+            current.UpdateControllerBounds();
+        }
     }
 
     internal override async Task Start(WebViewProfile environment)

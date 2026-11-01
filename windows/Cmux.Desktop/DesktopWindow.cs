@@ -549,6 +549,9 @@ internal sealed class DesktopWindow : Form
     {
         if (Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
         var location = LocatePane(workspace, pane);
+        // The hidden destination has a temporary small size while reparenting.
+        // Publish only the committed or restored viewport to the live ConPTY.
+        using var viewport = (pane as TerminalPane)?.DeferViewportLayout();
         var sequence = workspaceSequence + 1;
         var destination = new WorkspaceView(strings.Format("Workspace", sequence)) { Dock = DockStyle.Fill, Visible = false };
         var previousFence = selectingWorkspace;
