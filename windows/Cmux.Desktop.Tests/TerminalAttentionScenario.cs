@@ -41,7 +41,7 @@ internal static class TerminalAttentionScenario
         var path = Path.Combine(root, "layout.json");
         var gate = Path.Combine(root, "startup-gate");
         var history = Path.Combine(root, "history.txt");
-        var titles = Enumerable.Range(0, 16).Select(index => "RESTORE_BELL_" + index).ToArray();
+        var titles = Enumerable.Range(0, 3).Select(index => "RESTORE_BELL_" + index).ToArray();
         var snapshot = new SessionSnapshot(SessionSnapshot.CurrentVersion, titles.Length, titles.Length - 1,
             titles.Select(title => new WorkspaceSnapshot(title, 0, new LayoutSnapshot("terminal", Directory: root))).ToArray());
         using (var seed = new SessionStore(path)) { _ = seed.Open(); seed.Save(snapshot); }
@@ -56,6 +56,9 @@ internal static class TerminalAttentionScenario
         var processes = new Dictionary<TerminalPane, Process>();
         var subscriptions = new List<(TerminalPane Pane, Action Handler)>();
         var early = new HashSet<TerminalPane>();
+        var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var barrierEntered = false;
+        Exception? barrierFailure = null;
         string? profile = null;
         void Track(TerminalPane pane)
         {
@@ -66,28 +69,55 @@ internal static class TerminalAttentionScenario
         }
         try
         {
-            window.Show();
-            await Program.Until(() => Task.FromResult(window.Started.IsCompleted || window.Workspaces.Count() == titles.Length), "The saved workspaces were not mounted before startup.");
-            Require(!window.Started.IsCompleted, "The startup BEL fixture missed the pending restore phase.");
-            foreach (var pane in window.Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().ToArray())
+            // Subscribe synchronously as saved workspace trees are mounted.
+            // A test-owned modal loop holds the second projection until a real
+            // first-shell BEL is delivered, without a sleep or production seam.
+            window.Controls.OfType<Panel>().Single().ControlAdded += (_, args) =>
             {
-                void Observe()
+                if (args.Control is not WorkspaceView workspace) return;
+                workspace.ControlAdded += (_, _) =>
                 {
-                    Track(pane);
-                    if (!window.Started.IsCompleted) early.Add(pane);
-                }
-                pane.Bell += Observe;
-                subscriptions.Add((pane, Observe));
-            }
-            File.WriteAllText(gate, "release");
+                    foreach (var pane in workspace.Panes.OfType<TerminalPane>().ToArray())
+                    {
+                        if (subscriptions.Any(item => item.Pane == pane)) continue;
+                        void Observe()
+                        {
+                            Track(pane);
+                            if (!window.Started.IsCompleted) { early.Add(pane); delivered.TrySetResult(); }
+                        }
+                        pane.Bell += Observe;
+                        subscriptions.Add((pane, Observe));
+                    }
+                };
+                workspace.VisibleChanged += (_, _) =>
+                {
+                    if (workspace.Title != titles[1] || !workspace.Visible || barrierEntered) return;
+                    barrierEntered = true;
+                    using var barrier = new Form { ShowInTaskbar = false };
+                    barrier.Shown += async (_, _) =>
+                    {
+                        try
+                        {
+                            File.WriteAllText(gate, "release");
+                            await delivered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                        }
+                        catch (Exception error) { barrierFailure = error; }
+                        finally { barrier.Close(); }
+                    };
+                    barrier.ShowDialog(window);
+                };
+            };
+            window.Show();
             await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
             profile = window.ProfilePath;
             var restored = window.Workspaces.ToArray();
             foreach (var pane in restored.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>()) Track(pane);
             var unchanged = original.SequenceEqual(File.ReadAllBytes(path));
             Console.WriteLine("ATTENTION_RESTORE " + JsonSerializer.Serialize(new { startupBells = early.Count,
+                barrierEntered, barrierError = barrierFailure?.Message, nativeSidebar = window.Controls.OfType<ListBox>().Single().IsHandleCreated,
                 expected = titles.Length, actual = restored.Length, titles = restored.Select(workspace => workspace.Title).ToArray(),
                 canSave = store.CanSave, status = window.SessionStatus, unchanged }));
+            Require(barrierEntered && barrierFailure is null, "The owned startup barrier did not deliver a real shell BEL during restoration.");
             Require(early.Count > 0, "The startup BEL fixture did not interleave notification delivery with restoration.");
             Require(restored.Select(workspace => workspace.Title).SequenceEqual(titles) && store.CanSave
                 && window.SessionStatus == new Strings()["SessionRestored"], "A startup BEL made a valid saved layout fall back and disabled saving.");
