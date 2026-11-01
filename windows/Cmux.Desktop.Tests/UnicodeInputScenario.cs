@@ -137,7 +137,9 @@ internal static class UnicodeInputScenario
         {
             await using var fixture = new Fixture(source, shell.Executable);
             await fixture.Start();
-            var literal = Path.Combine(fixture.Root, "function-key-").Replace("'", "''", StringComparison.Ordinal);
+            var markerPrefix = Path.Combine(fixture.Root, "function-key-");
+            var literal = markerPrefix.Replace("'", "''", StringComparison.Ordinal);
+            var initialErrors = await fixture.Frame("$Error.Count");
             // Never open a marker that the callback can still be writing. Each
             // invocation creates a new file and the host checks metadata only.
             await fixture.Command("$global:__cmuxF3Count=0; Set-PSReadLineKeyHandler -Chord Ctrl+F3 -ScriptBlock { $global:__cmuxF3Count++; [IO.File]::WriteAllText(('" + literal + "'+$global:__cmuxF3Count+'.txt'),'callback') }");
@@ -145,18 +147,23 @@ internal static class UnicodeInputScenario
             try
             {
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.Exists(literal + "1.txt")), "The private Ctrl+F3 binding did not fire before Unicode input.");
+                await Until(() => Task.FromResult(File.Exists(markerPrefix + "1.txt")), "The private Ctrl+F3 binding did not fire before Unicode input.");
                 await fixture.Command("$global:__cmuxF3Unicode='日本語🍀'");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.Exists(literal + "2.txt")), "Ctrl+F3 stopped reaching PSReadLine after Unicode input.");
-                // Native input already reached this ConPTY. Its parser remembers
-                // that fact across renderer mode changes and resets.
+                await Until(() => Task.FromResult(File.Exists(markerPrefix + "2.txt")), "Ctrl+F3 stopped reaching PSReadLine after Unicode input.");
+                // Existing modified keys must keep working after text input
+                // and across renderer mode changes and resets.
                 await Parse(fixture.Pane, "\\u001b[?9001l");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.Exists(literal + "3.txt")), "Ctrl+F3 stopped reaching PSReadLine after mode disable.");
+                await Until(() => Task.FromResult(File.Exists(markerPrefix + "3.txt")), "Ctrl+F3 stopped reaching PSReadLine after mode disable.");
                 await Parse(fixture.Pane, "\\u001bc");
                 await fixture.Key("F3", "F3", 114, modifiers: 2);
-                await Until(() => Task.FromResult(File.Exists(literal + "4.txt")), "Ctrl+F3 stopped reaching PSReadLine after renderer reset.");
+                await Until(() => Task.FromResult(File.Exists(markerPrefix + "4.txt")), "Ctrl+F3 stopped reaching PSReadLine after renderer reset.");
+                // RIS clears only the renderer; Enter obtains a fresh visible
+                // prompt before querying the actual engine counter/error list.
+                await fixture.Submit();
+                Require(await fixture.Frame("$global:__cmuxF3Count") == "4", "The engine did not invoke the private callback exactly four times.");
+                Require(await fixture.Frame("$Error.Count") == initialErrors, "The private function-key callback raised an engine error.");
             }
             finally
             {
