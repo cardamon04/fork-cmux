@@ -10,7 +10,7 @@ When a search control has focus, **Paste** inserts into the search field, remove
 
 **Open browser** creates a browser beside the selected pane, or a browser workspace when none remains. Enter an HTTP/HTTPS URL and use **Go** or Enter, **Back**, **Forward**, **Reload** and **Developer tools**. A bare website name defaults to HTTPS; localhost and loopback addresses default to HTTP. Browser panes retain their history when switching workspaces and share a browser profile within this application instance. The terminal's Copy/Paste toolbar actions are disabled while a browser is selected; browser keyboard/context-menu operations belong to the web control.
 
-The application implements parts of F-01/F-02/F-06/F-10, not a complete Windows port. Persistent browser profiles, browser-data import, downloads, popup/new-window handling, permission grants, browser automation CLI/API, full session recovery, WSL/SSH integration, notifications, Ghostty settings and image protocols, configurable shortcuts, cloud/iPhone integration, installation and updates remain incomplete. Real OS IME composition and a full working day with real agents are not yet verified. There is no limit of ten live panes; ten is the initial concurrent terminal test workload.
+The application implements parts of F-01/F-02/F-03/F-06/F-10, not a complete Windows port. Persistent browser profiles, browser-data import, downloads, popup/new-window handling, permission grants, browser automation CLI/API, full session recovery, WSL/SSH integration, notifications, Ghostty settings and image protocols, configurable shortcuts, cloud/iPhone integration, installation and updates remain incomplete. Real OS IME composition and a full working day with real agents are not yet verified. There is no limit of ten live panes; ten is the initial concurrent terminal test workload.
 
 ## Run
 
@@ -33,6 +33,10 @@ Temporary WebView2 profiles belong to this app instance and are removed after co
 Web browsing uses a separate profile from the fixed-origin terminal renderer. Web pages have no WebView native message channel or host objects. Top-level browsing accepts HTTP/HTTPS and a blank page; file URLs and external application schemes are blocked. Popups, downloads and permission requests currently show localized notices and are declined. Browser data belongs to the temporary browser profile and is removed on application exit. The app does not open a remote debugging TCP port.
 
 Opening a browser preserves a pane selected while startup is pending. A failed browser process shows a local recovery message; workspace switching, resizing and healthy terminals remain usable. Close the failed pane and open a browser again to recover. The app does not automatically reload or resubmit a failed page.
+
+The status bar also shows the selected terminal's Git branch, or a 12-character commit ID for a detached HEAD. This requires Git for Windows on an absolute PATH entry with support for `--no-lazy-fetch`; Git is optional for running the terminal itself. Metadata refreshes after a directory/pane change and about every two seconds while a terminal is selected. Unborn branches, nested directories and linked worktrees use Git's own repository/ref discovery. Browser panes and unavailable, malformed or non-repository state clear the label. A fixed-width label keeps the full value in its tooltip. Paths and branch names render ampersands literally.
+
+Git status is display-only and is not persisted. It does not check out a branch or contact a Git remote. Dirty state, PRs and ports remain unimplemented.
 
 ## Save and reopen a layout
 
@@ -91,7 +95,11 @@ Integration checks decode the shell's actual provider path from a unique begin/e
 
 The UI catalog contains English, Japanese, German, French, Arabic, Spanish, Traditional/Simplified Chinese and Korean. The current Windows UI language selects a supported catalog, with English fallback. The terminal content follows the shell and font behavior.
 
+`Cmux.Desktop.Tests.exe --git-only [artifact-directory]` verifies the real Git reader and both PowerShell versions: Unicode/literal unborn branches, same-directory branch changes, detached HEAD, linked worktrees, native status rendering, owned DOM focus, pane/workspace/browser isolation, malformed HEAD/non-repository clearing, live shell input, storage scope and normal close. `--git-regression` selects the original missing-label regression. A private local promisor fixture verifies that reading a missing object neither fetches it nor writes objects; it uses no external host or account. These checks also run in the full suite. `git-status-pwsh.png` and `git-status-windows-powershell.png` capture only the owned native status strip, not WebView pixels or the user's desktop. They do not establish physical keyboard/mouse or real OS IME behavior.
+
 ## Boundaries and follow-up
+
+`GitStatus` reads metadata outside the UI thread with a four-second cancellation budget and bounded UTF-8 output. It resolves the executable from absolute PATH entries rather than the terminal working directory. Commands do not invoke a shell or run Git hooks, and disable lazy fetching and optional locks. Inherited `GIT_*` overrides cannot redirect the selected repository or enable trace-file writes. `DesktopWindow` serializes queries for its selected terminal, cancels stale requests, rejects stale results and stops its reader before pane teardown.
 
 `Cmux.Terminal` owns the ConPTY transport previously exercised by `Prototypes/WindowsTerminal`; both the application and those existing tests reference the same library. `TerminalConnection` serializes transport operations. `WorkspacePane` defines the shared pane lifecycle; `TerminalPane` owns the trusted renderer/output queue and `BrowserPane` owns untrusted document navigation. `WebViewProfile` owns each isolated profile/browser lifetime. `DesktopWindow` owns mixed workspace/pane actions and native controls. Toolbar actions share these same methods with the integration tests.
 
