@@ -80,9 +80,15 @@ internal static class BrowserStopScenario
                 {
                     second.NavigateFromAddress(fixture.Url(secondRequest.Path));
                     await secondRequest.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20));
-                    Require(!firstRequest.Closed.Task.IsCompleted && !secondRequest.Closed.Task.IsCompleted
-                        && !firstLoading.Completed.IsCompleted && !secondLoading.Completed.IsCompleted
-                        && browser.IsNavigationEnabled("Stop") && second.IsNavigationEnabled("Stop"), "The two exact connections were not independently pending.");
+                    var pending = new
+                    {
+                        firstClosed = firstRequest.Closed.Task.IsCompleted, secondClosed = secondRequest.Closed.Task.IsCompleted,
+                        firstCompleted = firstLoading.Completed.IsCompleted, secondCompleted = secondLoading.Completed.IsCompleted,
+                        firstStop = browser.IsNavigationEnabled("Stop"), secondStop = second.IsNavigationEnabled("Stop")
+                    };
+                    Console.WriteLine("BROWSER_STOP_PENDING " + JsonSerializer.Serialize(pending));
+                    Require(!pending.firstClosed && !pending.secondClosed && !pending.firstCompleted && !pending.secondCompleted
+                        && pending.firstStop && pending.secondStop, "The two exact connections were not independently pending.");
                     browser.ClickNavigation("Stop");
                     var result = await firstLoading.Completed.WaitAsync(TimeSpan.FromSeconds(20));
                     var disconnect = await firstRequest.Closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
