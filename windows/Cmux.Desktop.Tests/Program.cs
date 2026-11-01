@@ -36,6 +36,12 @@ internal static class Program
         var gitWorker = args is ["--git-worker-regression"];
         var orderRegression = args is ["--workspace-order-regression"];
         var orderOnly = args.Length > 0 && args[0] == "--workspace-order-only";
+        var detachRegression = args is ["--pane-detach-regression"];
+        var detachOnly = args.Length > 0 && args[0] == "--pane-detach-only";
+        var closeTerminal = args is ["--pane-close-terminal-regression"];
+        var closeBrowser = args is ["--pane-close-browser-regression"];
+        var detachOverflow = args is ["--pane-detach-overflow-regression"];
+        var asyncFocus = args is ["--pane-async-focus-regression"];
         var searchOnly = args.Length > 0 && args[0] == "--search-only";
         var searchClipboard = args.Length > 0 && args[0] == "--search-clipboard";
         var imeOnly = args.Length > 0 && args[0] is "--ime-only" or "--ime-enter" or "--ime-escape" or "--ime-arabic";
@@ -74,6 +80,39 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (asyncFocus)
+                {
+                    await PaneDetachScenario.AsyncFocusRegression(shell, passed, null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Async focus reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (detachOverflow)
+                {
+                    await PaneDetachScenario.OverflowRegression(shell, passed, null);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "The visible overflow action reached an unexpected UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (closeTerminal || closeBrowser)
+                {
+                    await PaneDetachScenario.CloseRegression(shell, closeBrowser, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Closing the native pane reached an unexpected UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
+                if (detachOnly || detachRegression)
+                {
+                    if (detachOnly) await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(1));
+                    else await PaneDetachScenario.Regression(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Pane detachment reached a native UI error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (orderOnly)
                 {
                     await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(1));
@@ -382,6 +421,7 @@ internal static class Program
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await GitStatusScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");

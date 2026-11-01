@@ -225,6 +225,14 @@ internal sealed class BrowserPane : WorkspacePane
     }
     internal void ClickNavigation(string key) => ((ToolStripButton)navigation.Items[key]!).PerformClick();
     internal bool IsNavigationEnabled(string key) => navigation.Enabled && navigation.Items[key]!.Enabled;
+    internal void FocusAddress()
+    {
+        if (stopped) return;
+        if (failed) Select();
+        else { address.Focus(); address.SelectAll(); }
+        NotifyActivated();
+    }
+
     internal override void FocusPane()
     {
         if (stopped) return;

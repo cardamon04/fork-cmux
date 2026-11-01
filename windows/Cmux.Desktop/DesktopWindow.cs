@@ -66,6 +66,7 @@ internal sealed class DesktopWindow : Form
         AddAction("SplitRight", () => Split(Orientation.Vertical));
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
         AddAction("OpenBrowser", OpenBrowser);
+        AddAction("MovePaneToNewWorkspace", MovePaneToNewWorkspace);
         AddAction("ClosePane", ClosePane);
         AddAction("CloseWorkspace", CloseWorkspace);
         AddAction("SaveSession", SaveSession);
@@ -113,6 +114,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
+        toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
     }
@@ -167,8 +169,30 @@ internal sealed class DesktopWindow : Form
     private async Task Run(Func<Task> action)
     {
         if (shuttingDown || closingWindow || environment is null) return;
-        toolbar.Enabled = false;
-        try { await action(); status.Text = strings["Ready"]; }
+        var selected = Current;
+        var active = selected?.Active;
+        var toolbarHadFocus = toolbar.ContainsFocus;
+        try
+        {
+            var previousFence = selectingWorkspace;
+            selectingWorkspace = true;
+            try
+            {
+                // Disabling a focused toolbar can restore another native pane.
+                // Preserve the logical target while projecting that UI change.
+                toolbar.Enabled = false;
+                if (toolbarHadFocus && selected == Current && active is { ContainsFocus: false })
+                {
+                    // Restore only during the synchronous projection. A later
+                    // user focus change during the action must remain theirs.
+                    try { active.FocusPane(); }
+                    catch (Exception error) { ShowError(error.Message); }
+                }
+            }
+            finally { selectingWorkspace = previousFence; }
+            await action();
+            status.Text = strings["Ready"];
+        }
         catch (Exception error) { ShowError(error.Message); }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
     }
@@ -373,7 +397,7 @@ internal sealed class DesktopWindow : Form
         {
             // A modal editor can restore a native child focus that does not
             // represent a new user pane selection.
-            if (!selectingWorkspace && !editingWorkspaceTitle && Current == workspace) ActivatePane(workspace, active);
+            if (!selectingWorkspace && !editingWorkspaceTitle && Current is { } selected) ActivatePane(selected, active);
         };
         pane.Failed += ShowError;
         if (pane is TerminalPane terminal)
@@ -463,21 +487,91 @@ internal sealed class DesktopWindow : Form
         }
     }
 
+    private sealed record PaneLocation(WorkspaceView Workspace, WorkspacePane Pane, SplitContainer Split,
+        SplitterPanel Panel, Control Sibling, Control Parent, int Index, double Ratio);
+
+    private static PaneLocation LocatePane(WorkspaceView workspace, WorkspacePane pane)
+    {
+        var panel = (SplitterPanel)pane.Parent!;
+        var split = (SplitContainer)panel.Parent!;
+        var sibling = (panel == split.Panel1 ? split.Panel2 : split.Panel1).Controls[0];
+        return new(workspace, pane, split, panel, sibling, split.Parent!, workspace.Panes.IndexOf(pane), workspace.SplitRatio(split));
+    }
+
+    private static void DetachPane(PaneLocation location)
+    {
+        // The removed split still owns the pane until a live destination
+        // adopts it, or ClosePane disposes that split and its child controls.
+        location.Sibling.Parent!.Controls.Remove(location.Sibling);
+        location.Parent.Controls.Remove(location.Split);
+        location.Parent.Controls.Add(location.Sibling);
+        location.Workspace.Panes.Remove(location.Pane);
+        location.Workspace.PendingRatios.Remove(location.Split);
+    }
+
+    private static void RestorePane(PaneLocation location)
+    {
+        location.Pane.Parent?.Controls.Remove(location.Pane);
+        location.Sibling.Parent?.Controls.Remove(location.Sibling);
+        location.Parent.Controls.Add(location.Split);
+        location.Panel.Controls.Add(location.Pane);
+        (location.Panel == location.Split.Panel1 ? location.Split.Panel2 : location.Split.Panel1).Controls.Add(location.Sibling);
+        if (!location.Workspace.Panes.Contains(location.Pane)) location.Workspace.Panes.Insert(location.Index, location.Pane);
+        location.Workspace.PendingRatios[location.Split] = location.Ratio;
+    }
+
+    private Task MovePaneToNewWorkspace()
+    {
+        if (Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
+        var location = LocatePane(workspace, pane);
+        var sequence = workspaceSequence + 1;
+        var destination = new WorkspaceView(strings.Format("Workspace", sequence)) { Dock = DockStyle.Fill, Visible = false };
+        var previousFence = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            content.Controls.Add(destination);
+            sidebar.Items.Add(destination);
+            DetachPane(location);
+            destination.Controls.Add(pane);
+            destination.Panes.Add(pane);
+            destination.Active = pane;
+            ActivatePane(workspace, workspace.Panes[0]);
+            sidebar.SelectedItem = destination;
+            workspaceSequence = sequence;
+        }
+        catch
+        {
+            // Keep the original split alive until adoption commits, so a
+            // native reparent failure can restore the exact live resources.
+            destination.Panes.Clear();
+            RestorePane(location);
+            content.Controls.Remove(destination);
+            sidebar.Items.Remove(destination);
+            destination.Dispose();
+            sidebar.SelectedItem = workspace;
+            ActivatePane(workspace, pane);
+            throw;
+        }
+        finally
+        {
+            selectingWorkspace = previousFence;
+            SelectWorkspace();
+        }
+        location.Split.Dispose();
+        if (pane is BrowserPane browser) browser.FocusAddress();
+        return Task.CompletedTask;
+    }
+
     internal async Task ClosePane()
     {
         if (Current is not { Active: { } pane } workspace) return;
         if (workspace.Panes.Count == 1) { await RemoveWorkspace(workspace); return; }
-        var splitPanel = (SplitterPanel)pane.Parent!;
-        var split = (SplitContainer)splitPanel.Parent!;
-        var sibling = (splitPanel == split.Panel1 ? split.Panel2 : split.Panel1).Controls[0];
-        var parent = split.Parent!;
-        sibling.Parent!.Controls.Remove(sibling);
-        parent.Controls.Remove(split);
-        parent.Controls.Add(sibling);
-        workspace.Panes.Remove(pane);
+        var location = LocatePane(workspace, pane);
+        DetachPane(location);
         ActivatePane(workspace, workspace.Panes[0]);
         await pane.DisposeAsync();
-        split.Dispose();
+        location.Split.Dispose();
         workspace.Active.FocusPane();
         UpdateActions();
     }
