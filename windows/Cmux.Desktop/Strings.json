@@ -48,7 +48,12 @@
     "FindMissing": "No matches.",
     "FindResults": "Search results",
     "FindSearching": "Searching…",
-    "WorkingDirectory": "Directory: {0}"
+    "WorkingDirectory": "Directory: {0}",
+    "RenameWorkspace": "Rename workspace",
+    "WorkspaceName": "Workspace name",
+    "Rename": "Rename",
+    "Cancel": "Cancel",
+    "WorkspaceNameInvalid": "Enter a nonblank name of up to {0} characters without control characters."
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -99,7 +104,12 @@
     "FindMissing": "一致する文字列はありません。",
     "FindResults": "検索結果",
     "FindSearching": "検索中…",
-    "WorkingDirectory": "作業ディレクトリ: {0}"
+    "WorkingDirectory": "作業ディレクトリ: {0}",
+    "RenameWorkspace": "ワークスペース名を変更",
+    "WorkspaceName": "ワークスペース名",
+    "Rename": "変更",
+    "Cancel": "キャンセル",
+    "WorkspaceNameInvalid": "空白だけではない{0}文字以内の名前を入力してください。制御文字は使用できません。"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -150,7 +160,12 @@
     "FindMissing": "Keine Treffer.",
     "FindResults": "Suchergebnisse",
     "FindSearching": "Suche läuft…",
-    "WorkingDirectory": "Verzeichnis: {0}"
+    "WorkingDirectory": "Verzeichnis: {0}",
+    "RenameWorkspace": "Arbeitsbereich umbenennen",
+    "WorkspaceName": "Name des Arbeitsbereichs",
+    "Rename": "Umbenennen",
+    "Cancel": "Abbrechen",
+    "WorkspaceNameInvalid": "Bitte einen nicht leeren Namen mit höchstens {0} Zeichen ohne Steuerzeichen eingeben."
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -201,7 +216,12 @@
     "FindMissing": "Aucun résultat.",
     "FindResults": "Résultats de recherche",
     "FindSearching": "Recherche en cours…",
-    "WorkingDirectory": "Dossier : {0}"
+    "WorkingDirectory": "Dossier : {0}",
+    "RenameWorkspace": "Renommer l’espace de travail",
+    "WorkspaceName": "Nom de l’espace de travail",
+    "Rename": "Renommer",
+    "Cancel": "Annuler",
+    "WorkspaceNameInvalid": "Saisissez un nom non vide de {0} caractères maximum, sans caractères de contrôle."
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -252,7 +272,12 @@
     "FindMissing": "لا توجد تطابقات.",
     "FindResults": "نتائج البحث",
     "FindSearching": "جارٍ البحث…",
-    "WorkingDirectory": "المجلد: {0}"
+    "WorkingDirectory": "المجلد: {0}",
+    "RenameWorkspace": "إعادة تسمية مساحة العمل",
+    "WorkspaceName": "اسم مساحة العمل",
+    "Rename": "إعادة التسمية",
+    "Cancel": "إلغاء",
+    "WorkspaceNameInvalid": "أدخل اسمًا غير فارغ لا يتجاوز {0} حرفًا، من دون محارف تحكم."
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -303,7 +328,12 @@
     "FindMissing": "No hay coincidencias.",
     "FindResults": "Resultados de búsqueda",
     "FindSearching": "Buscando…",
-    "WorkingDirectory": "Directorio: {0}"
+    "WorkingDirectory": "Directorio: {0}",
+    "RenameWorkspace": "Renombrar espacio de trabajo",
+    "WorkspaceName": "Nombre del espacio de trabajo",
+    "Rename": "Renombrar",
+    "Cancel": "Cancelar",
+    "WorkspaceNameInvalid": "Introduce un nombre no vacío de hasta {0} caracteres, sin caracteres de control."
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -354,7 +384,12 @@
     "FindMissing": "找不到符合的項目。",
     "FindResults": "搜尋結果",
     "FindSearching": "搜尋中…",
-    "WorkingDirectory": "工作目錄：{0}"
+    "WorkingDirectory": "工作目錄：{0}",
+    "RenameWorkspace": "重新命名工作區",
+    "WorkspaceName": "工作區名稱",
+    "Rename": "重新命名",
+    "Cancel": "取消",
+    "WorkspaceNameInvalid": "請輸入不全為空白、最多 {0} 個字元且不含控制字元的名稱。"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -405,7 +440,12 @@
     "FindMissing": "没有匹配项。",
     "FindResults": "搜索结果",
     "FindSearching": "正在搜索…",
-    "WorkingDirectory": "工作目录：{0}"
+    "WorkingDirectory": "工作目录：{0}",
+    "RenameWorkspace": "重命名工作区",
+    "WorkspaceName": "工作区名称",
+    "Rename": "重命名",
+    "Cancel": "取消",
+    "WorkspaceNameInvalid": "请输入不全为空白、最多 {0} 个字符且不含控制字符的名称。"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -456,6 +496,11 @@
     "FindMissing": "일치하는 항목이 없습니다.",
     "FindResults": "검색 결과",
     "FindSearching": "검색 중…",
-    "WorkingDirectory": "작업 디렉터리: {0}"
+    "WorkingDirectory": "작업 디렉터리: {0}",
+    "RenameWorkspace": "작업 공간 이름 바꾸기",
+    "WorkspaceName": "작업 공간 이름",
+    "Rename": "이름 바꾸기",
+    "Cancel": "취소",
+    "WorkspaceNameInvalid": "공백만 있는 이름은 사용할 수 없습니다. 제어 문자 없이 {0}자 이내로 입력하세요."
   }
 }

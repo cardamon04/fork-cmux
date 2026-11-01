@@ -19,6 +19,7 @@ internal sealed class DesktopWindow : Form
     private bool shuttingDown;
     private bool shutdownComplete;
     private bool selectingWorkspace;
+    private bool editingWorkspaceTitle;
     private bool closingWindow;
     private int workspaceSequence;
     internal Task Started => started.Task;
@@ -44,7 +45,14 @@ internal sealed class DesktopWindow : Form
         sidebar.ForeColor = Color.WhiteSmoke;
         sidebar.BorderStyle = BorderStyle.None;
         sidebar.SelectedIndexChanged += (_, _) => SelectWorkspace();
+        sidebar.MouseDoubleClick += (_, e) =>
+        {
+            if (toolbar.Enabled && e.Button == MouseButtons.Left && sidebar.SelectedIndex >= 0
+                && sidebar.IndexFromPoint(e.Location) == sidebar.SelectedIndex)
+                PendingAction = Run(RenameWorkspace);
+        };
         AddAction("NewWorkspace", NewWorkspace);
+        AddAction("RenameWorkspace", RenameWorkspace);
         AddAction("SplitRight", () => Split(Orientation.Vertical));
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
         AddAction("OpenBrowser", OpenBrowser);
@@ -90,6 +98,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Paste"]!.Enabled = allowed;
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
+        toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
         directoryStatus.Text = Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "";
         directoryStatus.ToolTipText = directoryStatus.Text;
     }
@@ -101,6 +110,38 @@ internal sealed class DesktopWindow : Form
         try { await action(); status.Text = strings["Ready"]; }
         catch (Exception error) { ShowError(error.Message); }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
+    }
+
+    private Task RenameWorkspace()
+    {
+        if (Current is not { } workspace) return Task.CompletedTask;
+        using var dialog = new WorkspaceRenameDialog(strings, workspace.Title);
+        DialogResult result;
+        editingWorkspaceTitle = true;
+        try { result = dialog.ShowDialog(this); }
+        finally { editingWorkspaceTitle = false; }
+        // The selected workspace may have changed while the modal loop ran.
+        // Restore its logical pane on every exit, including Cancel.
+        if (!shuttingDown && !closingWindow) SelectWorkspace();
+        if (result != DialogResult.OK || shuttingDown || closingWindow
+            || !Workspaces.Contains(workspace)) return Task.CompletedTask;
+        if (!workspace.TryRename(dialog.WorkspaceName)) throw new InvalidOperationException(strings.Format("WorkspaceNameInvalid", WorkspaceTitle.MaxCharacters));
+        var selected = Current;
+        var active = selected?.Active;
+        var wasSelecting = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            // Updating a native list item can emit temporary selection/focus
+            // events. It must only refresh the label, not select a pane.
+            sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace;
+            sidebar.SelectedItem = selected;
+        }
+        finally { selectingWorkspace = wasSelecting; }
+        if (selected is not null && selected == Current && active is not null) ActivatePane(selected, active);
+        UpdateActions();
+        if (selected == Current) active?.FocusPane();
+        return Task.CompletedTask;
     }
 
     private async Task Initialize()
@@ -249,7 +290,9 @@ internal sealed class DesktopWindow : Form
             ? new BrowserPane(strings) : new TerminalPane(strings, clipboard, paneLaunch ?? launch);
         pane.Activated += active =>
         {
-            if (!selectingWorkspace && Current == workspace) ActivatePane(workspace, active);
+            // A modal editor can restore a native child focus that does not
+            // represent a new user pane selection.
+            if (!selectingWorkspace && !editingWorkspaceTitle && Current == workspace) ActivatePane(workspace, active);
         };
         pane.Failed += ShowError;
         if (pane is TerminalPane terminal)
