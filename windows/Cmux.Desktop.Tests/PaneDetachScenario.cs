@@ -11,6 +11,7 @@ internal static class PaneDetachScenario
         await CloseRegression(source, browser: false, passed);
         await CloseRegression(source, browser: true, passed);
         await OverflowRegression(source, passed, artifacts);
+        await AsyncFocusRegression(source, passed, artifacts);
         await Integration(source, passed, artifacts);
         await AdoptionFailure(source, passed);
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
@@ -414,6 +415,65 @@ internal static class PaneDetachScenario
         if (control is ToolStrip strip)
             foreach (var item in strip.Items.OfType<ToolStripControlHost>())
                 foreach (var descendant in Descendants(item.Control)) yield return descendant;
+    }
+
+    internal static async Task AsyncFocusRegression(ShellLaunch source, List<string> passed, string? artifacts)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-pane-detach-").FullName;
+        await using var fixture = new BrowserFixture();
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        Process? process = null;
+        var profiles = new List<string>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? action = null;
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profiles.Add(window.ProfilePath);
+            var terminal = (TerminalPane)window.Current!.Active!;
+            process = Process.GetProcessById(terminal.ProcessId); _ = process.SafeHandle;
+            await Program.Contains(terminal, "CMUX_TEST_READY>");
+            await window.ClickAction("OpenBrowser");
+            profiles.Add(window.BrowserProfilePath!);
+            var browser = (BrowserPane)window.Current!.Active!;
+            browser.Core.Navigate(fixture.Url("async-focus"));
+            await Program.Until(async () => await browser.Core.ExecuteScriptAsync("document.querySelector('#page')?.textContent") == "\"/async-focus\"", "The async focus browser precondition was not ready.");
+            browser.FocusPane();
+            var toolbar = window.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
+            toolbar.Focus();
+            Require(toolbar.ContainsFocus && window.Current.Active == browser, "The awaited action did not start from the selected browser and toolbar.");
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var run = typeof(DesktopWindow).GetMethod("Run", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            action = (Task)run.Invoke(window, new object[] { (Func<Task>)(() => { entered.SetResult(); return gate.Task; }) })!;
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            var navigation = browser.Controls.OfType<ToolStrip>().First(strip => strip is not StatusStrip);
+            var address = navigation.Items.OfType<ToolStripTextBox>().Single();
+            address.TextBox.Focus();
+            address.SelectAll();
+            Require(address.TextBox.ContainsFocus && !toolbar.Enabled && window.Current.Active == browser,
+                "The owned newer address focus was not established while the action awaited.");
+            gate.SetResult();
+            await action.WaitAsync(TimeSpan.FromSeconds(30));
+            Console.WriteLine("PANE_ASYNC_FOCUS_TRACE " + JsonSerializer.Serialize(new
+            {
+                addressFocused = address.TextBox.ContainsFocus, samePane = window.Current.Active == browser,
+                selectedLength = address.SelectionLength, textLength = address.Text.Length, toolbar.Enabled, window.LastError,
+            }));
+            Require(address.TextBox.ContainsFocus && address.SelectionLength == address.Text.Length && window.Current.Active == browser
+                && toolbar.Enabled && window.LastError is null, "Awaited toolbar completion stole a newer address-field focus in the same browser pane.");
+            if (artifacts is not null) { Directory.CreateDirectory(artifacts); Capture(navigation, Path.Combine(artifacts, "pane-detach-async-address.png")); }
+            Pass("pane-detach-async-action-preserves-newer-in-pane-address-focus", passed);
+        }
+        finally
+        {
+            gate.TrySetResult();
+            if (action is not null) await action.WaitAsync(TimeSpan.FromSeconds(30));
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            if (process is not null) { Require(process.WaitForExit(0), "An async focus shell survived cleanup."); process.Dispose(); }
+            foreach (var profile in profiles) Require(!Directory.Exists(profile), "An async focus profile survived cleanup.");
+            DeleteFixture(root);
+        }
     }
 
     private static async Task AdoptionFailure(ShellLaunch source, List<string> passed)
