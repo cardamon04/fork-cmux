@@ -26,4 +26,8 @@ internal sealed class BrowserLoadState
         IsLoading = false;
         return true;
     }
+
+    // Null leaves an existing policy/cancellation explanation visible.
+    internal string? CompletionStatus(bool success, bool canceled) => success ? "Ready"
+        : canceled ? (StopRequested ? "NavigationStopped" : "Ready") : "NavigationFailed";
 }

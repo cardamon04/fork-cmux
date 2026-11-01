@@ -29,6 +29,15 @@ internal static class BrowserLoadStateScenario
         Require(other.IsLoading && !other.StopRequested && other.Complete(ulong.MaxValue), "Stop state leaked between panes or truncated a navigation ID.");
         Require(state.IsLoading && state.StopRequested && state.Complete(0), "Zero navigation identity was treated as an idle sentinel.");
         Pass(passed, "browser-load-pane-isolation-and-full-width-identity");
+        state.Begin(45);
+        state.Complete(45);
+        Require(state.CompletionStatus(false, true) is null, "A non-user cancellation overwrote an existing policy-denial message.");
+        Require(state.CompletionStatus(true, false) == "Ready" && state.CompletionStatus(false, false) == "NavigationFailed", "Completion status confused success and a real engine failure.");
+        state.Begin(46);
+        state.RequestStop();
+        state.Complete(46);
+        Require(state.CompletionStatus(false, true) == "NavigationStopped", "An explicit Stop lost its cancellation explanation.");
+        Pass(passed, "browser-load-cancellation-preserves-policy-denial");
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
         {
             var strings = new Strings(CultureInfo.GetCultureInfo(locale));

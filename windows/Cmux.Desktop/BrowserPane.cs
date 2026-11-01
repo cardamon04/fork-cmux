@@ -122,10 +122,8 @@ internal sealed class BrowserPane : WorkspacePane
         Core.NavigationCompleted += (_, e) =>
         {
             if (Unavailable || !loading.Complete(e.NavigationId)) return;
-            if (e.IsSuccess) message.Text = strings["Ready"];
-            else if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled)
-                message.Text = strings[loading.StopRequested ? "NavigationStopped" : "Ready"];
-            else message.Text = strings["NavigationFailed"];
+            if (loading.CompletionStatus(e.IsSuccess, e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) is { } status)
+                message.Text = strings[status];
             UpdateHistory();
         };
         UpdateBoundsAndAddress();
