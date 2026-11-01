@@ -61,6 +61,8 @@ internal sealed class DesktopWindow : Form
         };
         AddAction("NewWorkspace", NewWorkspace);
         AddAction("RenameWorkspace", RenameWorkspace);
+        AddAction("MoveWorkspaceUp", () => MoveWorkspace(-1));
+        AddAction("MoveWorkspaceDown", () => MoveWorkspace(1));
         AddAction("SplitRight", () => Split(Orientation.Vertical));
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
         AddAction("OpenBrowser", OpenBrowser);
@@ -109,6 +111,8 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["SaveSession"]!.Enabled = session?.CanSave == true;
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
+        toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
+        toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
     }
@@ -183,22 +187,41 @@ internal sealed class DesktopWindow : Form
         if (result != DialogResult.OK || shuttingDown || closingWindow
             || !Workspaces.Contains(workspace)) return Task.CompletedTask;
         if (!workspace.TryRename(dialog.WorkspaceName)) throw new InvalidOperationException(strings.Format("WorkspaceNameInvalid", WorkspaceTitle.MaxCharacters));
+        RefreshSidebar(() => sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace);
+        return Task.CompletedTask;
+    }
+
+    private Task MoveWorkspace(int offset)
+    {
+        var index = sidebar.SelectedIndex;
+        var target = index + offset;
+        if (Current is not { } workspace || target < 0 || target >= sidebar.Items.Count) return Task.CompletedTask;
+        RefreshSidebar(() =>
+        {
+            sidebar.Items.RemoveAt(index);
+            sidebar.Items.Insert(target, workspace);
+        });
+        return Task.CompletedTask;
+    }
+
+    private void RefreshSidebar(Action update)
+    {
         var selected = Current;
         var active = selected?.Active;
         var wasSelecting = selectingWorkspace;
         selectingWorkspace = true;
+        sidebar.BeginUpdate();
         try
         {
-            // Updating a native list item can emit temporary selection/focus
-            // events. It must only refresh the label, not select a pane.
-            sidebar.Items[sidebar.Items.IndexOf(workspace)] = workspace;
+            // Renaming/reordering native rows can emit temporary selection and
+            // focus events. Preserve the workspace and pane by object identity.
+            update();
             sidebar.SelectedItem = selected;
         }
-        finally { selectingWorkspace = wasSelecting; }
+        finally { sidebar.EndUpdate(); selectingWorkspace = wasSelecting; }
         if (selected is not null && selected == Current && active is not null) ActivatePane(selected, active);
         UpdateActions();
         if (selected == Current) active?.FocusPane();
-        return Task.CompletedTask;
     }
 
     private async Task Initialize()

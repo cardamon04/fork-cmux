@@ -56,7 +56,9 @@
     "WorkspaceNameInvalid": "Enter a nonblank name of up to {0} characters without control characters.",
     "GitStatusLabel": "Git branch",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0} (detached HEAD)"
+    "GitDetached": "Git: {0} (detached HEAD)",
+    "MoveWorkspaceUp": "Move workspace up",
+    "MoveWorkspaceDown": "Move workspace down"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -115,7 +117,9 @@
     "WorkspaceNameInvalid": "空白だけではない{0}文字以内の名前を入力してください。制御文字は使用できません。",
     "GitStatusLabel": "Gitブランチ",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0}（HEAD切り離し）"
+    "GitDetached": "Git: {0}（HEAD切り離し）",
+    "MoveWorkspaceUp": "ワークスペースを上へ",
+    "MoveWorkspaceDown": "ワークスペースを下へ"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -174,7 +178,9 @@
     "WorkspaceNameInvalid": "Bitte einen nicht leeren Namen mit höchstens {0} Zeichen ohne Steuerzeichen eingeben.",
     "GitStatusLabel": "Git-Branch",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0} (losgelöster HEAD)"
+    "GitDetached": "Git: {0} (losgelöster HEAD)",
+    "MoveWorkspaceUp": "Arbeitsbereich nach oben",
+    "MoveWorkspaceDown": "Arbeitsbereich nach unten"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -233,7 +239,9 @@
     "WorkspaceNameInvalid": "Saisissez un nom non vide de {0} caractères maximum, sans caractères de contrôle.",
     "GitStatusLabel": "Branche Git",
     "GitBranch": "Git : {0}",
-    "GitDetached": "Git : {0} (HEAD détachée)"
+    "GitDetached": "Git : {0} (HEAD détachée)",
+    "MoveWorkspaceUp": "Monter l’espace de travail",
+    "MoveWorkspaceDown": "Descendre l’espace de travail"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -292,7 +300,9 @@
     "WorkspaceNameInvalid": "أدخل اسمًا غير فارغ لا يتجاوز {0} حرفًا، من دون محارف تحكم.",
     "GitStatusLabel": "فرع Git",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0} (HEAD منفصل)"
+    "GitDetached": "Git: {0} (HEAD منفصل)",
+    "MoveWorkspaceUp": "نقل مساحة العمل لأعلى",
+    "MoveWorkspaceDown": "نقل مساحة العمل لأسفل"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -351,7 +361,9 @@
     "WorkspaceNameInvalid": "Introduce un nombre no vacío de hasta {0} caracteres, sin caracteres de control.",
     "GitStatusLabel": "Rama de Git",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0} (HEAD separado)"
+    "GitDetached": "Git: {0} (HEAD separado)",
+    "MoveWorkspaceUp": "Subir espacio de trabajo",
+    "MoveWorkspaceDown": "Bajar espacio de trabajo"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -410,7 +422,9 @@
     "WorkspaceNameInvalid": "請輸入不全為空白、最多 {0} 個字元且不含控制字元的名稱。",
     "GitStatusLabel": "Git 分支",
     "GitBranch": "Git：{0}",
-    "GitDetached": "Git：{0}（分離的 HEAD）"
+    "GitDetached": "Git：{0}（分離的 HEAD）",
+    "MoveWorkspaceUp": "將工作區上移",
+    "MoveWorkspaceDown": "將工作區下移"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -469,7 +483,9 @@
     "WorkspaceNameInvalid": "请输入不全为空白、最多 {0} 个字符且不含控制字符的名称。",
     "GitStatusLabel": "Git 分支",
     "GitBranch": "Git：{0}",
-    "GitDetached": "Git：{0}（分离的 HEAD）"
+    "GitDetached": "Git：{0}（分离的 HEAD）",
+    "MoveWorkspaceUp": "向上移动工作区",
+    "MoveWorkspaceDown": "向下移动工作区"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -528,6 +544,8 @@
     "WorkspaceNameInvalid": "공백만 있는 이름은 사용할 수 없습니다. 제어 문자 없이 {0}자 이내로 입력하세요.",
     "GitStatusLabel": "Git 브랜치",
     "GitBranch": "Git: {0}",
-    "GitDetached": "Git: {0} (분리된 HEAD)"
+    "GitDetached": "Git: {0} (분리된 HEAD)",
+    "MoveWorkspaceUp": "작업 공간 위로 이동",
+    "MoveWorkspaceDown": "작업 공간 아래로 이동"
   }
 }
