@@ -33,6 +33,7 @@ function fixture() {
   vm.runInContext(fs.readFileSync(path.join(assets, 'terminal.js'), 'utf8'), context, {filename: 'production-terminal.js'});
   const term = vm.runInContext('term', context);
   const result = {term, messages, observed,
+    valid: value => vm.runInContext('validTitle(' + JSON.stringify(value) + ')', context),
     titles: () => messages.filter(message => message.kind === 'title').map(message => message.data),
     configure: () => listener({data: {kind: 'configure', titleLimit: 512, cwdLimit: 0, strings: {}, locale: 'en'}}),
     flush: () => {const ready = [...timers.values()]; timers.clear(); for (const run of ready) run();},
@@ -68,8 +69,7 @@ const title = value => '\x1b]2;' + value + '\x1b\\';
   await first.write(title('previous valid')); first.flush();
   await first.write(title('new valid') + title('   ')); first.flush();
   check(first.titles().at(-1), 'new valid', 'A rejected blank title cannot discard the latest valid value in a coalesced burst');
-  await first.write(title('\ufeff')); first.flush();
-  check(first.titles().at(-1), '\ufeff', 'BOM is not .NET Unicode whitespace and remains literal title data');
+  check(first.valid('\ufeff'), true, 'Native-compatible validation does not classify BOM as Unicode whitespace');
   await first.write('\x1b]0;both title and icon\x07'); first.flush();
   check(first.titles().at(-1), 'both title and icon', 'OSC 0 with BEL publishes title');
   const count = first.titles().length;

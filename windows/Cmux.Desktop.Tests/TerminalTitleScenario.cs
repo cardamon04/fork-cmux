@@ -26,6 +26,7 @@ internal static class TerminalTitleScenario
             Require(!state.Update(invalid) && state.Value == literal, "Invalid title replaced the previous live value.");
         var boundary = string.Concat(Enumerable.Repeat("🍀", 256));
         Require(state.Update(boundary) && state.Value == boundary, "The exact title limit split a supplementary character.");
+        Require(state.Update("\ufeff") && state.Value == "\ufeff", "BOM was incorrectly classified as whitespace-only title data.");
         Require(state.Update("") && state.Value == "" && !state.Update(""), "Clearing title metadata did not reset idempotently.");
         Pass(passed, "terminal-title-bounded-literal-model-and-clear");
         foreach (var locale in new[] { "en", "ja", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko" })
