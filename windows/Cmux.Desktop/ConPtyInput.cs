@@ -8,9 +8,9 @@ internal static class ConPtyInput
     internal static string Encode(string text, bool win32Input)
     {
         // Size validation applies to the original text, before wire encoding.
-        // Preserve bracketed paste as a complete protocol-owned envelope.
-        if (!win32Input || text.StartsWith("\u001b[200~", StringComparison.Ordinal)
-            && text.EndsWith("\u001b[201~", StringComparison.Ordinal)) return text;
+        // VT payloads (including UTF-8 mouse reports and bracketed paste) are
+        // protocol data. Preserve the entire message when it has an introducer.
+        if (!win32Input || text.Contains('\u001b') || text.Any(c => c is >= '\u0080' and <= '\u009f')) return text;
         StringBuilder? encoded = null;
         var start = 0;
         for (var index = 0; index < text.Length; index++)
