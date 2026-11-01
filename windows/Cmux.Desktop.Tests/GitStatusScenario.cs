@@ -8,6 +8,7 @@ internal static class GitStatusScenario
         await Regression(source, passed);
         await ReaderCases(passed);
         await OutputBoundary(passed);
+        await WorkerFailure(source, passed);
         await Integration(source, "pwsh", passed, artifacts);
         var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
         Require(File.Exists(fallback), "The Windows PowerShell Git fixture is unavailable.");
@@ -84,6 +85,45 @@ internal static class GitStatusScenario
             Pass("git-reader-oversized-output-does-not-escape", passed);
         }
         finally { DeleteFixture(root); }
+    }
+
+    internal static async Task WorkerFailure(ShellLaunch source, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-git-state-").FullName;
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        Process? original = null;
+        string? profile = null;
+        const System.Reflection.BindingFlags hidden = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var workerField = typeof(DesktopWindow).GetField("gitWorker", hidden)!;
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profile = window.ProfilePath;
+            original = Process.GetProcessById(((TerminalPane)window.Current!.Active!).ProcessId);
+            _ = original.SafeHandle;
+            await Program.Contains((TerminalPane)window.Current.Active!, "CMUX_TEST_READY>");
+            var stopping = (CancellationTokenSource)typeof(DesktopWindow).GetField("gitClosing", hidden)!.GetValue(window)!;
+            stopping.Cancel();
+            await ((Task)workerField.GetValue(window)!).WaitAsync(TimeSpan.FromSeconds(10));
+            // Reproduce the already observed escaped-reader fault at the real
+            // lifecycle boundary, without constructing a malformed repository.
+            workerField.SetValue(window, Task.FromException(new InvalidDataException("Synthetic metadata worker failure.")));
+            var reported = false;
+            try { await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30)); }
+            catch (InvalidDataException) { reported = true; }
+            Require(reported, "Shutdown did not report its metadata worker failure.");
+            Require(original.WaitForExit(0) && !Directory.Exists(profile), "Metadata failure skipped owned shell/profile teardown.");
+            Pass("git-worker-failure-still-closes-owned-resources", passed);
+        }
+        finally
+        {
+            workerField.SetValue(window, Task.CompletedTask);
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            if (original is not null) { Require(original.WaitForExit(0), "The original worker fixture shell survived cleanup."); original.Dispose(); }
+            if (profile is not null) Require(!Directory.Exists(profile), "The worker fixture profile survived cleanup.");
+            DeleteFixture(root);
+        }
     }
 
     private static async Task ReaderCases(List<string> passed)
