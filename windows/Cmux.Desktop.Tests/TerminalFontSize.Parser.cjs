@@ -31,7 +31,19 @@ function fixture() {
   const term = vm.runInContext('term', context);
   const result = {term, messages, send: action => listener({data: {kind: 'fontSize', action}}),
     write: text => new Promise(resolve => term.write(text, resolve)),
-    text: () => vm.runInContext('window.cmux.text()', context)};
+    text: () => vm.runInContext('window.cmux.text()', context),
+    fittedGrid(width, height, cellWidth, cellHeight) {
+      element.clientWidth = width; element.clientHeight = height;
+      const measured = {cols: 80, rows: 24, options: {scrollback: 5000}, element: {parentElement: {}},
+        _core: {_renderService: {dimensions: {css: {cell: {width: cellWidth, height: cellHeight}}}, clear() {}}},
+        resize(cols, rows) {this.cols = cols; this.rows = rows;}};
+      context.window.getComputedStyle = () => ({getPropertyValue(name) {
+        return name === 'width' ? String(width) : name === 'height' ? String(height) : '0';
+      }});
+      vm.runInContext('fit', context).activate(measured);
+      vm.runInContext('resize()', context);
+      return {cols: measured.cols, rows: measured.rows};
+    }};
   fixtures.push(result);
   return result;
 }
@@ -60,5 +72,9 @@ function fixture() {
   check(first.term.options.fontSize, 14, 'Reset retains per-renderer isolation');
   check(second.term.options.fontSize, 13, 'A second renderer can change independently');
   check(first.text(), before, 'Bounded changes preserve Unicode buffer content');
+  const wide = fixture();
+  check(wide.fittedGrid(4900, 900, 8.4, 17), {cols: 581, rows: 52}, 'An ordinary fitted grid retains the pinned addon calculation');
+  check(wide.fittedGrid(4900, 900, 4, 8), {cols: 1000, rows: 112}, 'A small font must not resize the renderer beyond the native column limit');
+  check(wide.fittedGrid(9000, 9000, 4, 8), {cols: 1000, rows: 1000}, 'Both fitted axes must respect the existing native size limit');
   console.log(JSON.stringify({status: 'passed', checks, scope: 'Production terminal.js and pinned xterm options/buffer with inert DOM; geometry, focus and ConPTY resize require hosted GUI.'}));
 })().finally(() => {for (const f of fixtures) f.term.dispose();}).catch(error => {console.error(error); process.exitCode = 1;});

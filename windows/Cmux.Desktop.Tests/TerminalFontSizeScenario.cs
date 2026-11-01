@@ -104,6 +104,8 @@ internal static class TerminalFontSizeScenario
             foreach (var type in new[] { "keyDown", "keyUp" })
                 await first.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new { type, key = "Enter", code = "Enter", windowsVirtualKeyCode = 13, nativeVirtualKeyCode = 13, text = type == "keyDown" ? "\r" : "" }));
             await Program.Contains(first, "FONT_PENDING_日本語🍀");
+            await Program.Until(async () => (await Program.Text(first)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The reset private shell did not finish rendering its prompt.");
+            Console.WriteLine("FONT_SIZE_RESET " + JsonSerializer.Serialize(new { shell, text = await Program.Text(first), grid = await Size(first) }));
             await window.ClickAction("ResetFontSize");
             Require((await Size(first)).Font == 14, "Repeated reset changed the default font size.");
             if (artifacts is not null)
