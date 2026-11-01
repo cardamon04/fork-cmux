@@ -61,6 +61,7 @@ internal sealed record GitStatus(string Value, bool Detached)
         foreach (var key in start.Environment.Keys.Where(key => key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)).ToArray())
             start.Environment.Remove(key);
         start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        start.ArgumentList.Add("--no-lazy-fetch");
         start.ArgumentList.Add("--no-optional-locks");
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         using var process = Process.Start(start)!;
