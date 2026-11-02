@@ -157,6 +157,29 @@ internal static class TerminalSearchScenario
         }
         if (only is null or "copy")
         {
+            await Query(pane, "CLIPBOARD_READY");
+            await Results(pane, 1);
+            await pane.Core.ExecuteScriptAsync("(()=>{const q=document.getElementById('find-query');q.setSelectionRange(q.value.length,q.value.length);})()");
+            var ownsInput = await pane.Core.ExecuteScriptAsync("(()=>{const q=document.getElementById('find-query');return document.activeElement===q&&q.selectionStart===q.selectionEnd;})()") == "true";
+            var outputSelection = JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.selection()"));
+            Require(ownsInput && outputSelection == "CLIPBOARD_READY", "The collapsed-input Copy fixture did not establish separate input ownership and a real output match selection.");
+            const string previousClipboard = "PRIVATE_CLIPBOARD_MUST_STAY_UNCHANGED";
+            clipboard.Text = previousClipboard;
+            await window.ClickAction("Copy");
+            Console.WriteLine("SEARCH_COPY_OWNER " + JsonSerializer.Serialize(new { ownsInput, outputSelection, expected = previousClipboard, actual = clipboard.Text }));
+            Require(clipboard.Text == previousClipboard, "Copy with an unselected search input copied terminal output instead of preserving the clipboard.");
+            passed.Add("terminal-find-empty-input-selection-copy-preserves-clipboard-owner");
+            Console.WriteLine("passed: " + passed[^1]);
+
+            pane.FocusTerminal();
+            await pane.Core.ExecuteScriptAsync("window.cmux.focus()");
+            await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.activeElement===document.querySelector('.xterm-helper-textarea')") == "true", "The owned terminal textarea did not receive focus before terminal Copy.");
+            clipboard.Text = previousClipboard;
+            await window.ClickAction("Copy");
+            Require(clipboard.Text == "CLIPBOARD_READY", "Returning focus to the terminal did not restore Copy of the selected output.");
+            passed.Add("terminal-find-copy-focus-return-restores-output-selection");
+            Console.WriteLine("passed: " + passed[^1]);
+
             await Query(pane, "COPY_QUERY_PATTERN");
             await Results(pane, 0);
             await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').setSelectionRange(5,10)");
