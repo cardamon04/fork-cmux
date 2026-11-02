@@ -4,7 +4,7 @@
 
 ## PR #20: 端末リンクと内蔵ブラウザ
 
-- 開始前取得: 2026-11-02 04:08 UTC、`4ac6e872ac1982c6a82bd633d23ce4d0e348ff1f`。
+- 開始前の取得結果を2026-11-02 04:16 UTCのreport生成で照合: `4ac6e872ac1982c6a82bd633d23ce4d0e348ff1f`。
 - 候補確定前取得: 2026-11-02 04:22 UTC、同じ`4ac6e872ac1982c6a82bd633d23ce4d0e348ff1f`。#19終了時から新しいupstream commitはありません。
 - 初期baselineから42 commits。今回比較した`Sources/TerminalLinkOpenCoordinator.swift`はbaselineとの内容差分がなく、リンクのsource containerを解決する内蔵browser経路への新しい互換修正は不要です。WindowsのHTTP(S)リンク操作をこの既存機能に対応させます。
 - 累積差分の`AgentHookDeliveryProcess`/`TerminalController`、socket capability/authorization、tmux host runtimeは、未実装のagent/CLI/remote機能に関連します。#10以降の評価を引き継ぎ、リンク実装へ無関係なコードを取り込みません。全機能対応済みの判定ではありません。
