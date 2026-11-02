@@ -226,7 +226,10 @@ internal static class TerminalLinkScenario
             }
             """);
         var suffix = Guid.NewGuid().ToString("N");
-        await Program.Command(pane, "[Console]::Write([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"
+        // Use the PowerShell host's Unicode writer. Console.Write in the
+        // owned console's legacy encoding replaces this fixture's label
+        // before ConPTY/xterm receives it; changing that encoding is unneeded.
+        await Program.Command(pane, "Microsoft.PowerShell.Utility\\Write-Host -NoNewline ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"
             + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) + "'))); [Console]::WriteLine(('LINK_OUTPUT_' + '" + suffix + "'))");
         await Program.Contains(pane, "LINK_OUTPUT_" + suffix);
     }
