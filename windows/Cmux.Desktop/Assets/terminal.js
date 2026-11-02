@@ -20,9 +20,7 @@ term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
 const links = createTerminalLinks(term, send);
 term.options.linkHandler = links.handler;
-term.loadAddon(new WebLinksAddon.WebLinksAddon(links.handler.activate, {
-  hover: links.handler.hover, leave: links.handler.leave,
-}));
+term.loadAddon(links.plainAddon);
 let win32Input = false;
 let titleLimit = 0, pendingTitle = '', publishedTitle = '', titleTimer = null;
 function validTitle(data) {

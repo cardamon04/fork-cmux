@@ -31,6 +31,6 @@
 
 F-02/F-06の通常URLとOSC 8リンクをCtrl+クリックで隣の内蔵ブラウザに開く操作（#20）を選びます。本家`TerminalLinkOpenCoordinator`のsource paneを基点とする経路を比較対象とし、既存の分割・初期化・失敗時復旧を共用します。認証、履歴仕様、実PC前面操作に依存せず、既存の端末とbrowserを普段の開発で結び付ける単位です。
 
-通常クリック・別modifier・合成イベントでは開きません。rendererとnativeでHTTP(S)・資格情報なし・長さ等を検証し、停止済み/非選択/非表示sourceやbusy中の要求を無視します。live paneの移動後は現在のownerへ分割します。OS外部アプリの起動や保存対象は追加しません。実行結果は#20の同一HEADの記録を参照し、実PC GUIと全機能互換の合格にはしません。
+通常クリック・別modifier・合成イベントでは開きません。rendererとnativeでHTTP(S)・資格情報なし・長さ等を検証し、停止済み/非選択/非表示sourceやbusy中の要求を無視します。live paneの移動後は現在のownerへ分割します。OS外部アプリの起動や保存対象は追加しません。addonの探索windowで途中切れになる折り返しplain URLは開かず、短縮された別URLへの誤navigationを防ぎます。初期化後のprogrammatic navigationはGoボタンの選択通知を発生させず、新しい端末選択を維持します。実行結果は#20の同一HEADの記録を参照し、実PC GUIと全機能互換の合格にはしません。
 
 本家mainの取得と評価は[差分追跡記録](windows-upstream-reviews.md)へ残します。初期baselineからの未完差分を消さず、今回の対象経路への互換修正が必要かを分けて評価します。
