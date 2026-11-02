@@ -1,13 +1,13 @@
 # Windows実装の到達点と残作業
 
-2026-11-01時点の[要件](requirements.md)とDraft PR #1〜#16に対する整理です。各PRは未マージで、後続PRは直前のPRに依存します。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-01時点の[要件](requirements.md)とDraft PR #1〜#18に対する整理です。各PRは未マージで、後続PRは直前のPRに依存します。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
-| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12） | drag/drop、pin/group、複数window、本家操作の全比較 |
+| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）。大小文字だけの名前変更もnative行と一致（#18） | drag/drop、pin/group、複数window、本家操作の全比較 |
 | F-02 | ConPTY、両PowerShell、検索、Unicode入力、CWD、CDP composition、font zoom（#1/#3/#6/#7/#8/#13/#16） | 実OS IME、実PC GUI、全描画/protocol互換、WSL/SSH。pwsh過去prompt表示差は未解決 |
 | F-03 | local CWD、Git branch/切り離されたHEAD（#7/#10） | PR・port・最新通知、remote作業先 |
-| F-04 | 次の独立単位として端末BELのin-app未読・強調・移動を追加 | agent hook/CLI受信、一覧、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
+| F-04 | 端末BELのin-app未読・強調・移動（#17） | agent hook/CLI受信、一覧、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
 | F-05 | 技術検証段階 | 製品CLI/APIの契約、識別子・認可・通信境界、コマンドごとの互換性 |
 | F-06 | 混在browser pane、navigation、Stop、devtools、分離した一時profile（#2/#4/#15） | 取り込み、永続browserデータ、download/new-window/permission UI |
 | F-07 | WebView2 AX/CDPの技術検証（#2） | 製品API、安定した要素参照・認可・失敗時契約 |
