@@ -97,29 +97,30 @@ internal static class WorkspaceRenameScenario
             first.SelectWorkspace(0);
             const string selectedElsewhere = "  PROJECT 日本語😀 ; $() & <literal>  ";
             var terminal = (TerminalPane)pane!;
+            await first.ClickAction("OpenBrowser");
+            Track(first);
+            var keeper = (BrowserPane)workspace.Active!;
             var gate = Path.Combine(directory, "unread-rename-gate");
-            await Program.Command(terminal, "Write-Output ('CASE_'+'WAITING'); while (!(Test-Path -LiteralPath '"
-                + gate.Replace("'", "''", StringComparison.Ordinal) + "')) { Start-Sleep -Milliseconds 10 }; [Console]::Write([char]7)");
-            await Program.Contains(terminal, "CASE_WAITING");
-            Exception? bellFailure = null;
+            var deliveries = 0;
+            void Delivered() => deliveries++;
+            terminal.Bell += Delivered;
+            try
+            {
+                await Program.Command(terminal, "Write-Output ('CASE_'+'WAITING'); while (!(Test-Path -LiteralPath '"
+                    + gate.Replace("'", "''", StringComparison.Ordinal) + "')) { Start-Sleep -Milliseconds 10 }; [Console]::Write([char]7); Write-Output ('CASE_'+'SENT')");
+                await Program.Contains(terminal, "CASE_WAITING");
+                keeper.FocusPane();
+                await Program.Until(() => Task.FromResult(first.Current == workspace && workspace.Active == keeper && keeper.ContainsFocus), "The other owned pane was not focused before releasing the rename BEL.");
+                File.WriteAllText(gate, "release");
+                await Program.Contains(terminal, "CASE_SENT");
+                await Program.Until(() => Task.FromResult(deliveries == 1 && terminal.HasUnread), "The real BEL did not establish the captured rename target's unread state.");
+            }
+            finally { terminal.Bell -= Delivered; }
+            Require(NativeTitle(first, 0) == new Strings().Format("UnreadWorkspace", literal), "The real BEL did not decorate the old native name.");
             await Edit(first, () => { _ = first.ClickAction("RenameWorkspace"); }, dialog =>
             {
                 Input(dialog).Text = selectedElsewhere;
                 first.SelectWorkspace(1);
-                using var barrier = new Form { ShowInTaskbar = false };
-                barrier.Shown += async (_, _) =>
-                {
-                    try
-                    {
-                        File.WriteAllText(gate, "release");
-                        await Program.Until(() => Task.FromResult(terminal.HasUnread), "The real BEL did not mark the captured rename target unread.");
-                    }
-                    catch (Exception error) { bellFailure = error; }
-                    finally { barrier.Close(); }
-                };
-                barrier.ShowDialog(dialog);
-                Require(bellFailure is null && terminal.HasUnread, "The case-only rename fixture did not establish an unread background target.");
-                Require(NativeTitle(first, 0) == new Strings().Format("UnreadWorkspace", literal), "The real BEL did not decorate the old native name.");
                 Console.WriteLine("RENAME_BEFORE_CONFIRM " + JsonSerializer.Serialize(new { Selected = first.Current == other, Browser = other.Active == browserPane }));
                 Button(dialog, "Confirm").PerformClick();
             });
@@ -129,8 +130,13 @@ internal static class WorkspaceRenameScenario
             Require(terminal.HasUnread && NativeTitle(first, 0) == new Strings().Format("UnreadWorkspace", selectedElsewhere)
                 && NativeTitle(first, 1) == literal && browserPane!.ContainsFocus, "Case-only rename lost native casing, unread decoration or the other selected pane.");
             first.SelectWorkspace(0);
-            await Program.Until(() => Task.FromResult(!terminal.HasUnread), "Viewing the renamed target did not acknowledge its BEL.");
+            terminal.FocusTerminal();
+            await Program.Until(() => Task.FromResult(workspace.Active == terminal && !terminal.HasUnread), "Viewing the renamed target did not acknowledge its BEL.");
             Require(NativeTitle(first, 0) == selectedElsewhere, "Acknowledging unread lost the exact renamed native title.");
+            keeper.FocusPane();
+            await Program.Until(() => Task.FromResult(workspace.Active == keeper), "The temporary browser pane did not become the close target.");
+            await first.ClickAction("ClosePane");
+            Require(workspace.Panes.SequenceEqual(new[] { pane }) && workspace.Active == pane, "The unread fixture left an extra pane in the saved layout.");
             first.SelectWorkspace(1);
             Pass("workspace-rename-case-only-captured-unread-target-and-acknowledgment");
             Pass("workspace-rename-duplicates-browser-and-captured-target-isolation");
