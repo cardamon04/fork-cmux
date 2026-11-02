@@ -103,5 +103,6 @@ check(links.handler.allowNonHttpProtocols, false, 'OSC 8 cannot enable non-HTTP 
     if (count === 2100) check(requests.length, 1, 'A complete wrapped URL remains available');
     renderer.dispose();
   }
+  checks += await require(path.join(__dirname, 'TerminalLinks.Window.cjs'))(assets);
   console.log(JSON.stringify({status: 'passed', checks}));
 })().catch(error => {console.error(error); process.exitCode = 1;});
