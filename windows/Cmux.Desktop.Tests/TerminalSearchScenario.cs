@@ -12,6 +12,7 @@ internal static class TerminalSearchScenario
         await RunClipboard(window, clipboard, passed);
         using var firstProcess = Process.GetProcessById(first.ProcessId);
         _ = firstProcess.SafeHandle;
+        await NavigationCopy(window, clipboard, passed);
         // Emit separate words so the echoed command cannot supply the match.
         await Program.Command(first, "Write-Output ('FIND_'+'Alpha'); 1..70 | ForEach-Object { Write-Output ('scroll_'+$_) }; Write-Output ('FIND_'+'Alpha'); Write-Output ('find_'+'alpha')");
         await Program.Contains(first, "scroll_70");
@@ -189,6 +190,30 @@ internal static class TerminalSearchScenario
             passed.Add("terminal-find-toolbar-copies-search-input-selection");
             Console.WriteLine("passed: " + passed[^1]);
         }
+        await Click(pane, "find-close");
+    }
+
+    private static async Task NavigationCopy(DesktopWindow window, MemoryClipboard clipboard, List<string> passed)
+    {
+        var pane = (TerminalPane)window.Current!.Active!;
+        await window.ClickAction("Find");
+        await Query(pane, "clipboard_ready");
+        await Results(pane, 1);
+        await pane.Core.ExecuteScriptAsync("document.getElementById('find-query').setSelectionRange(0,5)");
+        await Click(pane, "find-next");
+        await Program.Until(async () => await pane.Core.ExecuteScriptAsync("document.activeElement.id") == "\"find-next\"", "The owned find navigation button did not receive focus.");
+        var owner = JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("document.activeElement.id"));
+        var latentQuerySelection = JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("(()=>{const q=document.getElementById('find-query');return q.value.slice(q.selectionStart,q.selectionEnd);})()"));
+        var outputSelection = JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.selection()"));
+        if (owner != "find-next" || latentQuerySelection != "clipb" || outputSelection != "CLIPBOARD_READY")
+            throw new InvalidOperationException("The navigation Copy fixture did not establish separate focused control, latent query selection and actual case-distinct match.");
+        clipboard.Text = "PRIVATE_NAVIGATION_CLIPBOARD";
+        await window.ClickAction("Copy");
+        Console.WriteLine("SEARCH_COPY_NAV " + JsonSerializer.Serialize(new { owner, latentQuerySelection, outputSelection, expected = "CLIPBOARD_READY", actual = clipboard.Text }));
+        if (clipboard.Text != "CLIPBOARD_READY")
+            throw new InvalidOperationException("Copy from a focused find navigation button used the unfocused query selection instead of the selected output match.");
+        passed.Add("terminal-find-navigation-copy-ignores-unfocused-query-selection");
+        Console.WriteLine("passed: " + passed[^1]);
         await Click(pane, "find-close");
     }
 
