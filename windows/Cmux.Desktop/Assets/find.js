@@ -73,7 +73,8 @@ function createTerminalSearch(term) {
       query.focus(); changed();
       return true;
     },
-    selection: () => ownsFocus() ? query.value.slice(query.selectionStart, query.selectionEnd) : '',
+    // null means find does not own Copy; an empty owned selection is handled.
+    selection: () => ownsFocus() ? query.value.slice(query.selectionStart, query.selectionEnd) : null,
     configure: (localized, locale) => {
       strings = localized;
       document.documentElement.lang = locale || 'en';

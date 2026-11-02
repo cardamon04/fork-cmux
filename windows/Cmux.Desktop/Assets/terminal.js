@@ -109,7 +109,7 @@ send({kind:'ready', cols:term.cols, rows:term.rows});
 // Read-only renderer inspection also supports application-level integration tests.
 window.cmux = Object.freeze({
   selection: () => term.getSelection(),
-  copySelection: () => find.selection() || term.getSelection(),
+  copySelection: () => find.selection() ?? term.getSelection(),
   text: () => Array.from({length:term.buffer.active.length}, (_,i) => term.buffer.active.getLine(i).translateToString(true)).join('\n'),
   size: () => ({cols:term.cols, rows:term.rows}),
   focus: () => term.focus(),
