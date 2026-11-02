@@ -7,6 +7,7 @@ internal static class TerminalLinkScenario
 {
     internal static async Task Run(ShellLaunch source, List<string> passed)
     {
+        await StartupSelection(source, passed);
         var start = new ProcessStartInfo("node") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "TerminalLinks.Parser.cjs"));
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "Assets"));
@@ -151,6 +152,67 @@ internal static class TerminalLinkScenario
         Pass(passed, "terminal-links-owned-shell-and-profile-cleanup");
     }
 
+    internal static async Task StartupSelection(ShellLaunch source, List<string> passed)
+    {
+        var root = Directory.CreateTempSubdirectory("cmux-link-selection-").FullName;
+        using var window = new DesktopWindow(source with { Directory = root }, new MemoryClipboard()) { ShowInTaskbar = false };
+        await using var fixture = new BrowserFixture();
+        Process? process = null;
+        string? profile = null, browserProfile = null;
+        try
+        {
+            window.Show();
+            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            profile = window.ProfilePath;
+            var pane = (TerminalPane)window.Current!.Active!;
+            process = Process.GetProcessById(pane.ProcessId);
+            _ = process.SafeHandle;
+            await Program.Contains(pane, "CMUX_TEST_READY>");
+            var owner = window.Current;
+            var url = fixture.Url("newer-selection-link");
+            await Output(pane, "\r\n" + url + "\r\n");
+            var point = await Hover(pane, url, expectHint: true);
+            var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pending = false;
+            var reselected = false;
+            void Reselect(string address)
+            {
+                pending = !window.PendingAction.IsCompleted && owner.Active is BrowserPane && owner.Panes.Count == 2;
+                // Same native pane-focus action as selecting the source while
+                // the new browser profile/controller initialization is pending.
+                pane.FocusPane();
+                reselected = owner.Active == pane;
+                received.TrySetResult();
+            }
+            pane.LinkRequested += Reselect;
+            try { await Click(pane, point, 2); await received.Task.WaitAsync(TimeSpan.FromSeconds(30)); }
+            finally { pane.LinkRequested -= Reselect; }
+            Require(pending && reselected, "The link selection regression did not exercise a newer source selection during pending creation.");
+            await window.PendingAction.WaitAsync(TimeSpan.FromSeconds(30));
+            await fixture.Requested("newer-selection-link").WaitAsync(TimeSpan.FromSeconds(30));
+            browserProfile = window.BrowserProfilePath;
+            var browser = owner.Panes.OfType<BrowserPane>().Single();
+            Console.WriteLine("TERMINAL_LINK_SELECTION " + JsonSerializer.Serialize(new { pending, reselected,
+                sourceRemainsActive = owner.Active == pane, browser.SessionAddress, requested = fixture.Requests("newer-selection-link") }));
+            Require(owner.Active == pane && window.Current == owner, "Link browser navigation overrode a newer terminal selection.");
+            Require(browser.SessionAddress == url && fixture.Requests("newer-selection-link") == 1 && window.LastError is null,
+                "Preserving source selection lost or duplicated link navigation.");
+            Pass(passed, "terminal-links-startup-preserves-newer-selection");
+        }
+        finally
+        {
+            browserProfile ??= window.BrowserProfilePath;
+            await window.Shutdown().WaitAsync(TimeSpan.FromSeconds(30));
+            if (process is not null) { Require(process.WaitForExit(0), "The selection fixture shell survived shutdown."); process.Dispose(); }
+            if (profile is not null) Require(!Directory.Exists(profile), "The selection terminal profile survived shutdown.");
+            if (browserProfile is not null) Require(!Directory.Exists(browserProfile), "The selection browser profile survived shutdown.");
+            var full = Path.GetFullPath(root);
+            Require(Path.GetDirectoryName(full) == Path.TrimEndingDirectorySeparator(Path.GetTempPath())
+                && Path.GetFileName(full).StartsWith("cmux-link-selection-", StringComparison.Ordinal), "Unexpected selection cleanup path.");
+            Directory.Delete(full, recursive: true);
+        }
+    }
+
     private static Task Output(TerminalPane pane, string text) => Program.Command(pane,
         "[Console]::Write([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) + "')))");
 
@@ -165,7 +227,7 @@ internal static class TerminalLinkScenario
               for (let y = b.viewportY; y < b.viewportY + term.rows; y++)
                 if (b.getLine(y)?.translateToString(true) === label) row = y - b.viewportY;
               const r = term.element.querySelector('.xterm-screen').getBoundingClientRect();
-              return {row, x:r.x + r.width / term.cols * 2.5, y:r.y + r.height / term.rows * (row + .5)};
+              return {row, x:r.x + r.width / term.cols * 2.5, otherX:r.x + r.width / term.cols * 4.5, y:r.y + r.height / term.rows * (row + .5)};
             })()
             """.Replace("LABEL", JsonSerializer.Serialize(label), StringComparison.Ordinal)));
         var p = json.RootElement;
@@ -173,6 +235,9 @@ internal static class TerminalLinkScenario
         var point = (X: p.GetProperty("x").GetDouble(), Y: p.GetProperty("y").GetDouble());
         // Leave a previously active link, then await the real linkifier hover callback.
         await Mouse(pane, "mouseMoved", (1, 1), 0, 0);
+        // xterm caches the last buffer cell across mouseleave. Enter a
+        // different real cell before returning to the target cell.
+        await Mouse(pane, "mouseMoved", (p.GetProperty("otherX").GetDouble(), point.Y), 0, 0);
         await Mouse(pane, "mouseMoved", point, 0, 0);
         if (expectHint) await Program.Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("term.element.title")) == new Strings()["OpenLinkHint"], "The real link provider did not activate its localized hover hint.");
         return point;

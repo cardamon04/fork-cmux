@@ -101,6 +101,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (args is ["--terminal-link-selection"])
+                {
+                    await TerminalLinkScenario.StartupSelection(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Link selection reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (attentionOnly)
                 {
                     await TerminalAttentionScenario.Run(shell, passed);
