@@ -21,15 +21,25 @@ function createTerminalLinks(term, send) {
     hover(event, text) { term.element.title = address(text) === null ? '' : hint; },
     leave() { term.element.removeAttribute('title'); },
   };
-  function complete(link) {
-    const buffer = term.buffer.active, {start, end} = link.range;
-    // The pinned addon bounds its wrapped-line scan. A match at a cut
-    // continuation boundary is only a fragment, never a navigation target.
-    const first = buffer.getLine(start.y - 1), previous = buffer.getLine(start.y - 2);
-    if (start.x === 1 && first?.isWrapped && /\S$/.test(previous?.translateToString(false) || '')) return false;
-    const next = end.x === 0 ? buffer.getLine(end.y - 1)
-      : end.x === term.cols ? buffer.getLine(end.y) : null;
-    return !next?.isWrapped || !/\S/.test(next.getCell(0)?.getChars() || '');
+  function completeWindow(row) {
+    const buffer = term.buffer.active;
+    if (!buffer.getLine(row - 1)) return false;
+    // The pinned addon expands at most 2048 characters in each direction.
+    // Refuse a whole logical block if that budget cannot cover it. Looking
+    // at candidate endpoints misses trimmed punctuation and nested schemes.
+    let characters = 0, lines = 0;
+    for (let index = row - 1; buffer.getLine(index)?.isWrapped;) {
+      const previous = buffer.getLine(--index);
+      if (!previous || ++lines > 2048) return false;
+      characters += previous.translateToString(true).length;
+      if (characters > 2048) return false;
+    }
+    characters = lines = 0;
+    for (let index = row; buffer.getLine(index)?.isWrapped; index++) {
+      characters += buffer.getLine(index).translateToString(true).length;
+      if (characters > 2048 || ++lines > 2048) return false;
+    }
+    return true;
   }
   let addon;
   const plainAddon = {
@@ -40,7 +50,10 @@ function createTerminalLinks(term, send) {
       addon.activate({
         get buffer() { return terminal.buffer; }, get cols() { return terminal.cols; },
         registerLinkProvider: provider => terminal.registerLinkProvider({
-          provideLinks(row, callback) { provider.provideLinks(row, candidates => callback(candidates?.filter(complete))); },
+          provideLinks(row, callback) {
+            if (completeWindow(row)) provider.provideLinks(row, callback);
+            else callback([]);
+          },
         }),
       });
     },

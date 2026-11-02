@@ -213,12 +213,32 @@ internal static class TerminalLinkScenario
         }
     }
 
-    private static Task Output(TerminalPane pane, string text) => Program.Command(pane,
-        "[Console]::Write([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) + "')))");
+    private static async Task Output(TerminalPane pane, string text)
+    {
+        await pane.Core.ExecuteScriptAsync("""
+            if (!window.cmuxLinkOutput) {
+              window.cmuxLinkOutput = [];
+              window.chrome.webview.addEventListener('message', event => {
+                if (event.data.kind !== 'output') return;
+                window.cmuxLinkOutput.push(event.data.data.slice(-8192));
+                if (window.cmuxLinkOutput.length > 32) window.cmuxLinkOutput.shift();
+              });
+            }
+            """);
+        var suffix = Guid.NewGuid().ToString("N");
+        await Program.Command(pane, "[Console]::Write([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"
+            + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) + "'))); [Console]::WriteLine(('LINK_OUTPUT_' + '" + suffix + "'))");
+        await Program.Contains(pane, "LINK_OUTPUT_" + suffix);
+    }
 
     private static async Task<(double X, double Y)> Hover(TerminalPane pane, string label, bool expectHint)
     {
-        await Program.Contains(pane, label);
+        try { await Program.Contains(pane, label); }
+        catch
+        {
+            Console.WriteLine("TERMINAL_LINK_MISSING_OUTPUT " + await pane.Core.ExecuteScriptAsync("JSON.stringify({text:window.cmux.text(),output:window.cmuxLinkOutput})"));
+            throw;
+        }
         await pane.Core.ExecuteScriptAsync("term.scrollToBottom()");
         using var json = JsonDocument.Parse(await pane.Core.ExecuteScriptAsync("""
             (() => {
