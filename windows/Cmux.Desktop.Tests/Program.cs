@@ -101,6 +101,14 @@ internal static class Program
                 profile = window.ProfilePath;
                 var first = (TerminalPane)window.Current!.Active!;
                 Track(ownedProcesses, first.ProcessId);
+                if (args is ["--terminal-link-selection"])
+                {
+                    await TerminalLinkScenario.StartupSelection(shell, passed);
+                    Require(uiErrors.Count == 0 && window.LastError is null, "Link selection reached an unexpected native error.");
+                    await window.Shutdown().WaitAsync(Deadline);
+                    exitCode = 0;
+                    return;
+                }
                 if (attentionOnly)
                 {
                     await TerminalAttentionScenario.Run(shell, passed);
@@ -482,6 +490,7 @@ internal static class Program
                 await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalFontSizeScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalAttentionScenario.Run(shell, passed);
+                await TerminalLinkScenario.Run(shell, passed);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
@@ -592,6 +601,12 @@ internal static class Program
         {
             var notice = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Microsoft.Web.WebView2.LICENSE.txt"));
             Require(notice.Contains("Microsoft") && notice.Contains("Redistribution and use"), "WebView2 distribution notice is incomplete.");
+        }
+        catch (Exception error) { failures.Add(error.Message); }
+        try
+        {
+            var notice = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Assets", "addon-web-links.LICENSE"));
+            Require(notice.Contains("MIT") && notice.Contains("Permission is hereby granted"), "WebLinksAddon distribution notice is incomplete.");
         }
         catch (Exception error) { failures.Add(error.Message); }
         using var stream = typeof(Strings).Assembly.GetManifestResourceStream("Cmux.Desktop.Strings.json")!;

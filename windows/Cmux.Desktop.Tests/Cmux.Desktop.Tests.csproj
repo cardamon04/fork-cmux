@@ -12,6 +12,8 @@
   <ItemGroup><None Update="TerminalTitle.Parser.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><None Update="TerminalFontSize.Parser.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><None Update="TerminalAttention.Parser.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup><None Update="TerminalLinks.Parser.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup><None Update="TerminalLinks.Window.cjs" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <Target Name="UseOnlyWebViewCore" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" /></ItemGroup>
   </Target>

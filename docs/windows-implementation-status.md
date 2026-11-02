@@ -1,6 +1,6 @@
 # Windows実装の到達点と残作業
 
-2026-11-02時点の[要件](requirements.md)とDraft PR #1〜#19に対する整理です。各PRは未マージで、後続PRは直前のPRに依存します。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-02時点の[要件](requirements.md)とDraft PR #1〜#20に対する整理です。各PRは未マージで、後続PRは直前のPRに依存します。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
@@ -29,8 +29,8 @@
 
 ## 次の独立単位を選ぶ理由
 
-要件は本家の全機能対応と普段の作業再現を優先します。上記不具合について既存証拠で安全に切り分けた後、未実装F-04のうち認証・永続保存・実PC前面操作に依存しない**端末BELの未読表示と移動**を選びます。本家`DockSplitStore+AttentionRouting`のvisual BEL経路を比較対象にします。
+F-02/F-06の通常URLとOSC 8リンクをCtrl+クリックで隣の内蔵ブラウザに開く操作（#20）を選びます。本家`TerminalLinkOpenCoordinator`のsource paneを基点とする経路を比較対象とし、既存の分割・初期化・失敗時復旧を共用します。認証、履歴仕様、実PC前面操作に依存せず、既存の端末とbrowserを普段の開発で結び付ける単位です。
 
-未読はlive terminal paneの一時状態です。inactive pane/workspace/windowのBELで強調し、実際にその端末へfocusを戻したときに既読にします。受信だけでfocusを奪わず、移動後は新しいownerへ通知します。OSCのBEL終端は通知せず、BEL floodはrendererごとに100msのleading cooldownで抑えます。保存schemaやOS通知設定は増やしません。
+通常クリック・別modifier・合成イベントでは開きません。rendererとnativeでHTTP(S)・資格情報なし・長さ等を検証し、停止済み/非選択/非表示sourceやbusy中の要求を無視します。live paneの移動後は現在のownerへ分割します。OS外部アプリの起動や保存対象は追加しません。addonの探索windowで途中切れになる折り返しplain URLは開かず、短縮された別URLへの誤navigationを防ぎます。初期化後のprogrammatic navigationはGoボタンの選択通知を発生させず、新しい端末選択を維持します。実行結果は#20の同一HEADの記録を参照し、実PC GUIと全機能互換の合格にはしません。
 
-本家`manaflow-ai/cmux:main`の日次差分確認を継続します。実装開始時の比較先は`4ac6e872ac1982c6a82bd633d23ce4d0e348ff1f`で、#16終了時と同じです。更新は互換修正が必要な差分だけを個別評価し、無関係な一括取り込みは行いません。
+本家mainの取得と評価は[差分追跡記録](windows-upstream-reviews.md)へ残します。初期baselineからの未完差分を消さず、今回の対象経路への互換修正が必要かを分けて評価します。

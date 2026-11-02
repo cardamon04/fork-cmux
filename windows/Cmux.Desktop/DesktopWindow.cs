@@ -508,6 +508,15 @@ internal sealed class DesktopWindow : Form
             // Title arrival is display-only. Never project focus or selection.
             terminal.TitleChanged += () => { if (Current?.Active == terminal) UpdateCaption(); };
             terminal.Bell += () => TerminalBell(terminal);
+            terminal.LinkRequested += address =>
+            {
+                // Resolve live ownership at activation, including a moved pane.
+                // Busy/stale messages cannot open a split in a different owner.
+                if (!toolbar.Enabled || shuttingDown || closingWindow || editingWorkspaceTitle
+                    || Current is not { } owner || owner.Active != terminal
+                    || !owner.Panes.Contains(terminal) || !terminal.Visible) return;
+                PendingAction = Run(() => Split(Orientation.Vertical, PaneKind.Browser, address));
+            };
         }
         workspace.Panes.Add(pane);
         return pane;
@@ -559,7 +568,7 @@ internal sealed class DesktopWindow : Form
 
     internal Task OpenBrowser() => Current is null ? NewWorkspace(PaneKind.Browser) : Split(Orientation.Vertical, PaneKind.Browser);
 
-    private async Task Split(Orientation orientation, PaneKind kind)
+    private async Task Split(Orientation orientation, PaneKind kind, string? address = null)
     {
         if (Current is not { Active: { } previous } workspace) return;
         var parent = previous.Parent!;
@@ -578,6 +587,7 @@ internal sealed class DesktopWindow : Form
         try
         {
             await StartPane(pane);
+            if (pane is BrowserPane browser && address is not null) browser.RestoreAddress(address);
             if (workspace.SelectionRevision == selection && Current == workspace) pane.FocusPane();
         }
         catch

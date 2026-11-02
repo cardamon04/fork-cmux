@@ -539,3 +539,12 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---
+
+## xterm.js WebLinksAddon (Windows desktop)
+
+- **Version:** @xterm/addon-web-links 0.12.0
+- **License:** MIT
+- **Source:** https://github.com/xtermjs/xterm.js/tree/master/addons/addon-web-links
+- **Distribution:** The full upstream license is included beside the bundled script as `Assets/addon-web-links.LICENSE`.

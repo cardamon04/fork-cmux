@@ -230,7 +230,10 @@ internal sealed class BrowserPane : WorkspacePane
         // Retain the saved target while a new document has yet to commit.
         // A later SourceChanged replaces it with the actual navigated address.
         SessionAddress = text;
-        NavigateFromAddress(text);
+        address.Text = text;
+        // Programmatic navigation must not synthesize a Go-button activation:
+        // a newer pane selection can own focus while initialization awaits.
+        UseNative(NavigateAddress);
     }
     internal void ClickNavigation(string key) => ((ToolStripButton)navigation.Items[key]!).PerformClick();
     internal bool IsNavigationEnabled(string key) => navigation.Enabled && navigation.Items[key]!.Enabled;
