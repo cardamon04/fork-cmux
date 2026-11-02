@@ -21,6 +21,7 @@ function fixture() {
     return term;
   }
   const context = vm.createContext({Terminal,
+    WebLinksAddon: require(path.join(assets, 'addon-web-links.js')),
     FitAddon: require(path.join(assets, 'addon-fit.js')),
     Unicode11Addon: require(path.join(assets, 'addon-unicode11.js')),
     document: {getElementById() {return element;}},
@@ -30,6 +31,7 @@ function fixture() {
     clearTimeout(id) {timers.delete(id);},
     createTerminalSearch: () => ({paste() {return false;}, configure() {}, open() {}, selection() {return null;}}),
   });
+  vm.runInContext(fs.readFileSync(path.join(assets, 'links.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(assets, 'terminal.js'), 'utf8'), context, {filename: 'production-terminal.js'});
   const term = vm.runInContext('term', context);
   const result = {term, messages, observed,

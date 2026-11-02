@@ -18,6 +18,11 @@ term.loadAddon(new Unicode11Addon.Unicode11Addon());
 term.unicode.activeVersion = '11';
 term.open(document.getElementById('terminal'));
 function send(message) { window.chrome.webview.postMessage(message); }
+const links = createTerminalLinks(term, send);
+term.options.linkHandler = links.handler;
+term.loadAddon(new WebLinksAddon.WebLinksAddon(links.handler.activate, {
+  hover: links.handler.hover, leave: links.handler.leave,
+}));
 let win32Input = false;
 let titleLimit = 0, pendingTitle = '', publishedTitle = '', titleTimer = null;
 function validTitle(data) {
@@ -99,6 +104,7 @@ window.chrome.webview.addEventListener('message', event => {
     if (Number.isSafeInteger(m.windowsBuild) && m.windowsBuild > 0)
       term.options.windowsPty = {backend: 'conpty', buildNumber: m.windowsBuild};
     find.configure(m.strings, m.locale);
+    links.configure(m.strings);
   }
   else if (m.kind === 'find') find.open();
   else if (m.kind === 'fontSize') fontSize(m.action);

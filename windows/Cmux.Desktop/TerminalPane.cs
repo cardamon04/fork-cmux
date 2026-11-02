@@ -23,6 +23,7 @@ internal sealed class TerminalPane : WorkspacePane
     internal string Title => title.Value;
     internal event Action? TitleChanged;
     internal event Action? Bell;
+    internal event Action<string>? LinkRequested;
     internal bool HasUnread;
     private string? pendingDirectory;
     private string? lastDirectoryReport;
@@ -120,6 +121,7 @@ internal sealed class TerminalPane : WorkspacePane
             ["/terminal.css"] = "text/css", ["/xterm.js"] = "text/javascript", ["/xterm.css"] = "text/css",
             ["/addon-fit.js"] = "text/javascript", ["/addon-unicode11.js"] = "text/javascript",
             ["/addon-search.js"] = "text/javascript", ["/find.js"] = "text/javascript",
+            ["/addon-web-links.js"] = "text/javascript", ["/links.js"] = "text/javascript",
         };
         if (uri.GetLeftPart(UriPartial.Authority) != "https://cmux-terminal.invalid" || !files.TryGetValue(uri.AbsolutePath, out var mime))
         {
@@ -146,7 +148,7 @@ internal sealed class TerminalPane : WorkspacePane
                         kind = "configure", locale = System.Globalization.CultureInfo.CurrentUICulture.Name,
                         cwdLimit = WorkingDirectoryReport.MaxUriCharacters, titleLimit = TerminalTitle.MaxCharacters,
                         windowsBuild = Environment.OSVersion.Version.Build,
-                        strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching" }
+                        strings = new[] { "FindPlaceholder", "FindPrevious", "FindNext", "FindCase", "FindClose", "FindEmpty", "FindMissing", "FindResults", "FindSearching", "OpenLinkHint" }
                             .ToDictionary(key => key, key => strings[key]),
                     }));
                     ready.TrySetResult(SizeFrom(root));
@@ -170,6 +172,10 @@ internal sealed class TerminalPane : WorkspacePane
                 case "focus": if (ContainsFocus) NotifyActivated(); break;
                 case "activate": if (Visible) { FocusPane(); NotifyActivated(); } break;
                 case "bell": Bell?.Invoke(); break;
+                case "openLink":
+                    if (root.TryGetProperty("data", out var link) && link.ValueKind == JsonValueKind.String
+                        && TerminalLink.TryAddress(link.GetString(), out var address)) LinkRequested?.Invoke(address);
+                    break;
                 case "title":
                     if (root.TryGetProperty("data", out var titleValue) && titleValue.ValueKind == JsonValueKind.String
                         && title.Update(titleValue.GetString())) TitleChanged?.Invoke();

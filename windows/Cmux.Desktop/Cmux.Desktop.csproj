@@ -25,6 +25,8 @@
     <Content Include="node_modules/@xterm/addon-unicode11/LICENSE" Link="Assets/addon-unicode11.LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/addon-search/lib/addon-search.js" Link="Assets/addon-search.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="node_modules/@xterm/addon-search/LICENSE" Link="Assets/addon-search.LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-web-links/lib/addon-web-links.js" Link="Assets/addon-web-links.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="node_modules/@xterm/addon-web-links/LICENSE" Link="Assets/addon-web-links.LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="UseOnlyWebViewCore" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>
