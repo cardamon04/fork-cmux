@@ -73,7 +73,10 @@ function createTerminalSearch(term) {
       query.focus(); changed();
       return true;
     },
-    selection: () => ownsFocus() ? query.value.slice(query.selectionStart, query.selectionEnd) : '',
+    // Only the input owns its selection. Navigation controls leave Copy to
+    // the output match; an empty selection in the focused input is handled.
+    selection: () => !bar.hidden && document.activeElement === query
+      ? query.value.slice(query.selectionStart, query.selectionEnd) : null,
     configure: (localized, locale) => {
       strings = localized;
       document.documentElement.lang = locale || 'en';

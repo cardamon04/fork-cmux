@@ -28,7 +28,7 @@ function fixture() {
     ResizeObserver: class {observe() {}},
     setTimeout(callback, delay) {check(delay, 100, 'Title publication has a bounded 100ms cadence'); timers.set(++timerId, callback); return timerId;},
     clearTimeout(id) {timers.delete(id);},
-    createTerminalSearch: () => ({paste() {return false;}, configure() {}, open() {}, selection() {return '';}}),
+    createTerminalSearch: () => ({paste() {return false;}, configure() {}, open() {}, selection() {return null;}}),
   });
   vm.runInContext(fs.readFileSync(path.join(assets, 'terminal.js'), 'utf8'), context, {filename: 'production-terminal.js'});
   const term = vm.runInContext('term', context);

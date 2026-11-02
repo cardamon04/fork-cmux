@@ -26,7 +26,7 @@ function fixture() {
     ResizeObserver: class {observe() {}},
     setTimeout(callback) {const id = ++nextTimer; timers.set(id, callback); return id;},
     clearTimeout(id) {timers.delete(id);},
-    createTerminalSearch: () => ({paste() {return false;}, configure() {}, open() {}, selection() {return '';}}),
+    createTerminalSearch: () => ({paste() {return false;}, configure() {}, open() {}, selection() {return null;}}),
   });
   vm.runInContext(fs.readFileSync(path.join(assets, 'addon-fit.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(assets, 'terminal.js'), 'utf8'), context);
