@@ -324,12 +324,17 @@ internal static class TerminalAttentionScenario
             Pass(passed, "terminal-notification-list-" + shell + "-reopen-and-acknowledge");
 
             await Bell(first, () => window.SelectWorkspace(1));
-            notifications = OpenNotifications();
-            var chosen = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
-            await Bell(other, () => { }, () => notifications.DropDown.Visible);
+            ToolStripMenuItem? chosen = null;
+            await Bell(other, () =>
+            {
+                // Command intentionally focuses its source before entering the
+                // gate. Open/capture the menu only after that preparation.
+                notifications = OpenNotifications();
+                chosen = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            }, () => notifications.DropDown.Visible && !other.ContainsFocus);
             Require(first.HasUnread && other.HasUnread && !other.ContainsFocus,
                 "The current terminal did not become unread while the notification menu held focus.");
-            chosen.PerformClick();
+            chosen!.PerformClick();
             await window.PendingAction;
             await Program.Until(() => Task.FromResult(window.Current == workspace && workspace.Active == first
                 && first.ContainsFocus && !first.HasUnread), "Choosing a notification did not focus its target after menu dismissal.");
