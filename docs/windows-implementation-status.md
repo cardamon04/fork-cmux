@@ -1,13 +1,13 @@
 # Windows実装の到達点と残作業
 
-2026-11-02時点の[要件](requirements.md)とDraft PR #1〜#19に対する整理です。各PRは未マージで、後続PRは直前のPRに依存します。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-05時点の[要件](requirements.md)とDraft PR #1〜#19・#21に対する整理です。各PRは未マージで、#21は#19に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
 | F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）。大小文字だけの名前変更もnative行と一致（#18） | drag/drop、pin/group、複数window、本家操作の全比較 |
 | F-02 | ConPTY、両PowerShell、検索、Unicode入力、CWD、CDP composition、font zoom（#1/#3/#6/#7/#8/#13/#16）。空selectionの検索入力でもCopyを端末出力から分離（#19） | 実OS IME、実PC GUI、全描画/protocol互換、WSL/SSH。pwsh過去prompt表示差は未解決 |
 | F-03 | local CWD、Git branch/切り離されたHEAD（#7/#10） | PR・port・最新通知、remote作業先 |
-| F-04 | 端末BELのin-app未読・強調・移動（#17） | agent hook/CLI受信、一覧、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
+| F-04 | 端末BELのin-app未読・強調・移動（#17）、未読端末の一覧と行選択（#21） | agent hook/CLI受信、通知本文・既読履歴、一覧のdigit shortcut、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
 | F-05 | 技術検証段階 | 製品CLI/APIの契約、識別子・認可・通信境界、コマンドごとの互換性 |
 | F-06 | 混在browser pane、navigation、Stop、devtools、分離した一時profile（#2/#4/#15） | 取り込み、永続browserデータ、download/new-window/permission UI |
 | F-07 | WebView2 AX/CDPの技術検証（#2） | 製品API、安定した要素参照・認可・失敗時契約 |
@@ -29,8 +29,8 @@
 
 ## 次の独立単位を選ぶ理由
 
-要件は本家の全機能対応と普段の作業再現を優先します。上記不具合について既存証拠で安全に切り分けた後、未実装F-04のうち認証・永続保存・実PC前面操作に依存しない**端末BELの未読表示と移動**を選びます。本家`DockSplitStore+AttentionRouting`のvisual BEL経路を比較対象にします。
+F-04で明記された通知一覧のうち、既存BELの未読端末を行から選ぶ操作を#21で扱います。4agent・10paneを使う際に「次の未読」以外から対象を選べる単位で、認証・履歴仕様・実PC前面操作に依存しません。#20のリンク修正は再開せず、#19から分岐した独立実装です。
 
-未読はlive terminal paneの一時状態です。inactive pane/workspace/windowのBELで強調し、実際にその端末へfocusを戻したときに既読にします。受信だけでfocusを奪わず、移動後は新しいownerへ通知します。OSCのBEL終端は通知せず、BEL floodはrendererごとに100msのleading cooldownで抑えます。保存schemaやOS通知設定は増やしません。
+未読は引き続きlive terminal paneの一時状態です。表示済み行はpaneを保持し、後着BELで対象を変えません。クリック時に生存状態・未読状態・現在のownerを確認し、既存の未読移動と同じ経路でfocus・既読化します。通知の永続保存、OS通知設定、新しいshortcutは追加しません。本家のmodifier/digitによる通知行操作は未実装として残します。
 
-本家`manaflow-ai/cmux:main`の日次差分確認を継続します。実装開始時の比較先は`4ac6e872ac1982c6a82bd633d23ce4d0e348ff1f`で、#16終了時と同じです。更新は互換修正が必要な差分だけを個別評価し、無関係な一括取り込みは行いません。
+本家`manaflow-ai/cmux:main`の日次差分確認を継続します。#21開始時の比較先は`c9ed9bd7078e439efc1e09e50cd5577af33ee516`です。初期baselineと未完項目を保持し、[差分評価と検証範囲](windows-notifications-list.md)を記録します。

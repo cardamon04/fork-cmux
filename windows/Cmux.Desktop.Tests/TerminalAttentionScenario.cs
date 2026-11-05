@@ -29,6 +29,11 @@ internal static class TerminalAttentionScenario
         {
             var strings = new Strings(CultureInfo.GetCultureInfo(locale));
             Require(!string.IsNullOrWhiteSpace(strings["NextUnread"]) && strings.Format("UnreadWorkspace", "WORKSPACE").Contains("WORKSPACE", StringComparison.Ordinal), "Attention translation missing: " + locale);
+            Require(!string.IsNullOrWhiteSpace(strings["Notifications"]) && !string.IsNullOrWhiteSpace(strings["NoUnreadNotifications"])
+                && strings.Format("NotificationTerminal", 12).Contains("12", StringComparison.Ordinal)
+                && strings.Format("NotificationTarget", "WORKSPACE", "TERMINAL").Contains("WORKSPACE", StringComparison.Ordinal)
+                && strings.Format("NotificationTarget", "WORKSPACE", "TERMINAL").Contains("TERMINAL", StringComparison.Ordinal),
+                "Notification list translation or placeholders missing: " + locale);
         }
         Pass(passed, "terminal-attention-nine-locales");
         await Integration(source, "pwsh", passed);
@@ -286,11 +291,17 @@ internal static class TerminalAttentionScenario
             Require(!JsonSerializer.Serialize(window.CaptureSession()).Contains("Unread", StringComparison.Ordinal), "Unread attention expanded the saved session schema.");
             Pass(passed, "terminal-attention-" + shell + "-workspace-routing-and-ephemeral-state");
 
+            var notificationWorkspaceTitle = workspace.Title;
+            Require(workspace.TryRename("通知 & list"), "Could not name the private notification fixture.");
             await Bell(first, () => window.SelectWorkspace(1));
             var notifications = OpenNotifications();
             var drawn = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
-            Require(drawn.Enabled && (drawn.Text ?? "").Contains(workspace.Title, StringComparison.Ordinal),
+            Require(drawn.Enabled && (drawn.Text ?? "").Contains(workspace.Title.Replace("&", "&&", StringComparison.Ordinal), StringComparison.Ordinal),
                 "The notification row does not identify its workspace.");
+            var drawnName = drawn.AccessibilityObject.Name ?? "";
+            Require(drawnName.Contains(workspace.Title, StringComparison.Ordinal) && !drawnName.Contains("&&", StringComparison.Ordinal),
+                "The native notification row's accessible label lost literal workspace text.");
+            Pass(passed, "terminal-notification-list-" + shell + "-native-localized-accessibility");
             await Bell(second, () => { }, () => notifications.DropDown.Visible);
             Require(first.HasUnread && second.HasUnread && notifications.DropDownItems.Count == 1
                 && ReferenceEquals(notifications.DropDownItems[0], drawn), "A new BEL changed the row the user already saw.");
@@ -302,11 +313,13 @@ internal static class TerminalAttentionScenario
             Pass(passed, "terminal-notification-list-" + shell + "-drawn-row-stable-during-arrival");
             notifications = OpenNotifications();
             var remaining = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            Require(remaining.AccessibilityObject.Name != drawnName, "Different panes have indistinguishable notification labels.");
             remaining.PerformClick();
             await window.PendingAction;
             await Program.Until(() => Task.FromResult(workspace.Active == second && second.ContainsFocus && !second.HasUnread),
                 "Reopening the list did not show and acknowledge the remaining unread pane.");
             first.FocusTerminal();
+            Require(workspace.TryRename(notificationWorkspaceTitle), "Could not restore the private notification fixture title.");
             Require(workspace.Active == first && !window.IsActionEnabled("NextUnread"), "Notification navigation left a stale unread marker.");
             Pass(passed, "terminal-notification-list-" + shell + "-reopen-and-acknowledge");
 
