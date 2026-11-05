@@ -323,6 +323,26 @@ internal static class TerminalAttentionScenario
             Require(workspace.Active == first && !window.IsActionEnabled("NextUnread"), "Notification navigation left a stale unread marker.");
             Pass(passed, "terminal-notification-list-" + shell + "-reopen-and-acknowledge");
 
+            await Bell(first, () => window.SelectWorkspace(1));
+            notifications = OpenNotifications();
+            var chosen = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            await Bell(other, () => { }, () => notifications.DropDown.Visible);
+            Require(first.HasUnread && other.HasUnread && !other.ContainsFocus,
+                "The current terminal did not become unread while the notification menu held focus.");
+            chosen.PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(window.Current == workspace && workspace.Active == first
+                && first.ContainsFocus && !first.HasUnread), "Choosing a notification did not focus its target after menu dismissal.");
+            Require(other.HasUnread, "Menu dismissal acknowledged a different unread terminal before selecting the chosen row.");
+            notifications = OpenNotifications();
+            notifications.DropDownItems.OfType<ToolStripMenuItem>().Single().PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(window.Current == otherWorkspace && other.ContainsFocus && !other.HasUnread),
+                "The notification that arrived in the current pane was lost instead of remaining selectable.");
+            window.SelectWorkspace(0);
+            first.FocusTerminal();
+            Pass(passed, "terminal-notification-list-" + shell + "-current-pane-arrival-menu-dismissal");
+
             await window.ClickAction("MovePaneToNewWorkspace");
             var destination = window.Current!;
             Require(destination != workspace && destination.Active == first, "The live pane did not move.");
