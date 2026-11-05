@@ -218,8 +218,16 @@ internal sealed class DesktopWindow : Form
         if (shuttingDown || closingWindow || pane.IsDisposed || !pane.HasUnread) return Task.CompletedTask;
         var owner = Workspaces.FirstOrDefault(workspace => workspace.Panes.Contains(pane));
         if (owner is null) return Task.CompletedTask;
-        ActivatePane(owner, pane);
-        sidebar.SelectedItem = owner;
+        var previousFence = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            // ActivatePane acknowledges Current. Establish the chosen owner
+            // before it runs, without projecting the owner's previous pane.
+            sidebar.SelectedItem = owner;
+            ActivatePane(owner, pane);
+        }
+        finally { selectingWorkspace = previousFence; }
         SelectWorkspace();
         return Task.CompletedTask;
     }
