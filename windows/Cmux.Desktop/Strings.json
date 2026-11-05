@@ -67,7 +67,11 @@
     "DecreaseFontSize": "Decrease font size",
     "ResetFontSize": "Reset font size",
     "NextUnread": "Next unread pane",
-    "UnreadWorkspace": "Unread — {0}"
+    "UnreadWorkspace": "Unread — {0}",
+    "Notifications": "Unread notifications",
+    "NoUnreadNotifications": "No unread notifications",
+    "NotificationTerminal": "Terminal {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -137,7 +141,11 @@
     "DecreaseFontSize": "文字を小さくする",
     "ResetFontSize": "文字サイズをリセット",
     "NextUnread": "次の未読ペイン",
-    "UnreadWorkspace": "未読 — {0}"
+    "UnreadWorkspace": "未読 — {0}",
+    "Notifications": "未読通知",
+    "NoUnreadNotifications": "未読通知はありません",
+    "NotificationTerminal": "端末 {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -207,7 +215,11 @@
     "DecreaseFontSize": "Schrift verkleinern",
     "ResetFontSize": "Schriftgröße zurücksetzen",
     "NextUnread": "Nächster ungelesener Bereich",
-    "UnreadWorkspace": "Ungelesen — {0}"
+    "UnreadWorkspace": "Ungelesen — {0}",
+    "Notifications": "Ungelesene Benachrichtigungen",
+    "NoUnreadNotifications": "Keine ungelesenen Benachrichtigungen",
+    "NotificationTerminal": "Terminalbereich {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -277,7 +289,11 @@
     "DecreaseFontSize": "Réduire le texte",
     "ResetFontSize": "Réinitialiser la taille du texte",
     "NextUnread": "Volet non lu suivant",
-    "UnreadWorkspace": "Non lu — {0}"
+    "UnreadWorkspace": "Non lu — {0}",
+    "Notifications": "Notifications non lues",
+    "NoUnreadNotifications": "Aucune notification non lue",
+    "NotificationTerminal": "Terminal n° {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -347,7 +363,11 @@
     "DecreaseFontSize": "تصغير حجم الخط",
     "ResetFontSize": "إعادة ضبط حجم الخط",
     "NextUnread": "الجزء التالي غير المقروء",
-    "UnreadWorkspace": "غير مقروء — {0}"
+    "UnreadWorkspace": "غير مقروء — {0}",
+    "Notifications": "الإشعارات غير المقروءة",
+    "NoUnreadNotifications": "لا توجد إشعارات غير مقروءة",
+    "NotificationTerminal": "الطرفية {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -417,7 +437,11 @@
     "DecreaseFontSize": "Reducir el tamaño del texto",
     "ResetFontSize": "Restablecer el tamaño del texto",
     "NextUnread": "Siguiente panel sin leer",
-    "UnreadWorkspace": "Sin leer — {0}"
+    "UnreadWorkspace": "Sin leer — {0}",
+    "Notifications": "Notificaciones sin leer",
+    "NoUnreadNotifications": "No hay notificaciones sin leer",
+    "NotificationTerminal": "Terminal n.º {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -487,7 +511,11 @@
     "DecreaseFontSize": "縮小字體",
     "ResetFontSize": "重設字體大小",
     "NextUnread": "下一個未讀窗格",
-    "UnreadWorkspace": "未讀 — {0}"
+    "UnreadWorkspace": "未讀 — {0}",
+    "Notifications": "未讀通知",
+    "NoUnreadNotifications": "沒有未讀通知",
+    "NotificationTerminal": "終端 {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -557,7 +585,11 @@
     "DecreaseFontSize": "缩小字体",
     "ResetFontSize": "重置字体大小",
     "NextUnread": "下一个未读窗格",
-    "UnreadWorkspace": "未读 — {0}"
+    "UnreadWorkspace": "未读 — {0}",
+    "Notifications": "未读通知",
+    "NoUnreadNotifications": "没有未读通知",
+    "NotificationTerminal": "终端 {0}",
+    "NotificationTarget": "{0} — {1}"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -627,6 +659,10 @@
     "DecreaseFontSize": "글꼴 크기 줄이기",
     "ResetFontSize": "글꼴 크기 초기화",
     "NextUnread": "다음 읽지 않은 창",
-    "UnreadWorkspace": "읽지 않음 — {0}"
+    "UnreadWorkspace": "읽지 않음 — {0}",
+    "Notifications": "읽지 않은 알림",
+    "NoUnreadNotifications": "읽지 않은 알림이 없습니다",
+    "NotificationTerminal": "터미널 {0}",
+    "NotificationTarget": "{0} — {1}"
   }
 }

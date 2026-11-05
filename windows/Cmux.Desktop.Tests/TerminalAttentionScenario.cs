@@ -29,6 +29,11 @@ internal static class TerminalAttentionScenario
         {
             var strings = new Strings(CultureInfo.GetCultureInfo(locale));
             Require(!string.IsNullOrWhiteSpace(strings["NextUnread"]) && strings.Format("UnreadWorkspace", "WORKSPACE").Contains("WORKSPACE", StringComparison.Ordinal), "Attention translation missing: " + locale);
+            Require(!string.IsNullOrWhiteSpace(strings["Notifications"]) && !string.IsNullOrWhiteSpace(strings["NoUnreadNotifications"])
+                && strings.Format("NotificationTerminal", 12).Contains("12", StringComparison.Ordinal)
+                && strings.Format("NotificationTarget", "WORKSPACE", "TERMINAL").Contains("WORKSPACE", StringComparison.Ordinal)
+                && strings.Format("NotificationTarget", "WORKSPACE", "TERMINAL").Contains("TERMINAL", StringComparison.Ordinal),
+                "Notification list translation or placeholders missing: " + locale);
         }
         Pass(passed, "terminal-attention-nine-locales");
         await Integration(source, "pwsh", passed);
@@ -145,6 +150,21 @@ internal static class TerminalAttentionScenario
         var processes = new List<Process>();
         string? profile = null, browserProfile = null;
         void Track(TerminalPane pane) { var process = Process.GetProcessById(pane.ProcessId); _ = process.SafeHandle; processes.Add(process); }
+        ToolStripDropDownButton OpenNotifications()
+        {
+            var strip = window.Controls.OfType<ToolStrip>().Single(item => item is not StatusStrip);
+            var button = strip.Items.OfType<ToolStripDropDownButton>().SingleOrDefault(item => item.Name == "Notifications");
+            Require(button is not null, "The native unread notifications list is missing.");
+            if (button!.IsOnOverflow) strip.OverflowButton.ShowDropDown();
+            button.ShowDropDown();
+            Require(button.DropDown.Visible, "The native unread notifications list did not open.");
+            return button;
+        }
+        void CloseNotifications(ToolStripDropDownButton button)
+        {
+            button.HideDropDown();
+            window.Controls.OfType<ToolStrip>().Single(item => item is not StatusStrip).OverflowButton.HideDropDown();
+        }
         async Task Bell(TerminalPane pane, Action beforeRelease, Func<bool>? focusReady = null, bool focusTextarea = false)
         {
             await Task.Delay(150); // Distinct BELs must outlive the renderer cooldown.
@@ -218,6 +238,14 @@ internal static class TerminalAttentionScenario
             string Row(WorkspaceView item) => WorkspaceOrderScenario.NativeNames(window)[sidebar.Items.IndexOf(item)];
             var plain = Row(workspace);
             Require(!window.IsActionEnabled("NextUnread"), "Next unread must be disabled without unread panes.");
+            var empty = OpenNotifications();
+            Require(empty.DropDownItems.Count == 1 && !empty.DropDownItems[0].Enabled,
+                "The empty notification list must show one disabled placeholder.");
+            Require(window.Current == workspace && workspace.Active == second && !first.HasUnread && !second.HasUnread,
+                "Opening the empty notification list changed selection or unread state.");
+            CloseNotifications(empty);
+            second.FocusTerminal();
+            Pass(passed, "terminal-notification-list-" + shell + "-empty-native-menu");
 
             await Bell(first, () => second.FocusTerminal());
             await Program.Until(() => Task.FromResult(first.HasUnread), "A real background ConPTY BEL did not mark its pane unread.");
@@ -263,6 +291,66 @@ internal static class TerminalAttentionScenario
             Require(!JsonSerializer.Serialize(window.CaptureSession()).Contains("Unread", StringComparison.Ordinal), "Unread attention expanded the saved session schema.");
             Pass(passed, "terminal-attention-" + shell + "-workspace-routing-and-ephemeral-state");
 
+            var notificationWorkspaceTitle = workspace.Title;
+            Require(workspace.TryRename("通知 & list"), "Could not name the private notification fixture.");
+            await Bell(first, () => window.SelectWorkspace(1));
+            var notifications = OpenNotifications();
+            var drawn = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            Require(drawn.Enabled && (drawn.Text ?? "").Contains(workspace.Title.Replace("&", "&&", StringComparison.Ordinal), StringComparison.Ordinal),
+                "The notification row does not identify its workspace.");
+            var drawnName = drawn.AccessibilityObject.Name ?? "";
+            Require(drawnName.Contains(workspace.Title, StringComparison.Ordinal) && !drawnName.Contains("&&", StringComparison.Ordinal),
+                "The native notification row's accessible label lost literal workspace text.");
+            Pass(passed, "terminal-notification-list-" + shell + "-native-localized-accessibility");
+            await Bell(second, () => { }, () => notifications.DropDown.Visible);
+            Require(first.HasUnread && second.HasUnread && notifications.DropDownItems.Count == 1
+                && ReferenceEquals(notifications.DropDownItems[0], drawn), "A new BEL changed the row the user already saw.");
+            drawn.PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(window.Current == workspace && workspace.Active == first
+                && first.ContainsFocus && !first.HasUnread), "The drawn notification row did not select and acknowledge its original pane.");
+            Require(second.HasUnread, "Selecting one notification acknowledged another pane.");
+            Pass(passed, "terminal-notification-list-" + shell + "-drawn-row-stable-during-arrival");
+            notifications = OpenNotifications();
+            var remaining = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            Require(remaining.AccessibilityObject.Name != drawnName, "Different panes have indistinguishable notification labels.");
+            remaining.PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(workspace.Active == second && second.ContainsFocus && !second.HasUnread),
+                "Reopening the list did not show and acknowledge the remaining unread pane.");
+            first.FocusTerminal();
+            Require(workspace.TryRename(notificationWorkspaceTitle), "Could not restore the private notification fixture title.");
+            Require(workspace.Active == first && !window.IsActionEnabled("NextUnread"), "Notification navigation left a stale unread marker.");
+            Pass(passed, "terminal-notification-list-" + shell + "-reopen-and-acknowledge");
+
+            await Bell(first, () => window.SelectWorkspace(1));
+            ToolStripMenuItem? chosen = null;
+            await Bell(other, () =>
+            {
+                // Command intentionally focuses its source before entering the
+                // gate. Open/capture the menu only after that preparation.
+                var nativeToolbar = window.Controls.OfType<ToolStrip>().Single(item => item is not StatusStrip);
+                Require(nativeToolbar.Focus() && nativeToolbar.ContainsFocus,
+                    "The owned notification fixture toolbar could not acquire native focus.");
+                notifications = OpenNotifications();
+                chosen = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
+            }, () => notifications.DropDown.Visible && !other.ContainsFocus);
+            Require(first.HasUnread && other.HasUnread && !other.ContainsFocus,
+                "The current terminal did not become unread while the notification menu held focus.");
+            chosen!.PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(window.Current == workspace && workspace.Active == first
+                && first.ContainsFocus && !first.HasUnread), "Choosing a notification did not focus its target after menu dismissal.");
+            Require(other.HasUnread, "Menu dismissal acknowledged a different unread terminal before selecting the chosen row.");
+            notifications = OpenNotifications();
+            notifications.DropDownItems.OfType<ToolStripMenuItem>().Single().PerformClick();
+            await window.PendingAction;
+            await Program.Until(() => Task.FromResult(window.Current == otherWorkspace && other.ContainsFocus && !other.HasUnread),
+                "The notification that arrived in the current pane was lost instead of remaining selectable.");
+            window.SelectWorkspace(0);
+            first.FocusTerminal();
+            Pass(passed, "terminal-notification-list-" + shell + "-current-pane-arrival-menu-dismissal");
+
             await window.ClickAction("MovePaneToNewWorkspace");
             var destination = window.Current!;
             Require(destination != workspace && destination.Active == first, "The live pane did not move.");
@@ -291,10 +379,19 @@ internal static class TerminalAttentionScenario
             // removal must also remove the navigation target without a stale event.
             await Bell(first, () => { browser.FocusPane(); window.SelectWorkspace(1); });
             await Program.Until(() => Task.FromResult(first.HasUnread), "The close fixture did not establish unread attention.");
+            var closingNotifications = OpenNotifications();
+            var stale = closingNotifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
             window.SelectWorkspace(2);
             browser.FocusPane();
             await window.CloseWorkspace();
             Require(!window.Workspaces.Contains(destination) && !window.IsActionEnabled("NextUnread"), "Closing an unread workspace left a navigation target.");
+            var selectedAfterClose = window.Current;
+            var activeAfterClose = selectedAfterClose?.Active;
+            stale.PerformClick();
+            await window.PendingAction;
+            Require(window.Current == selectedAfterClose && selectedAfterClose?.Active == activeAfterClose,
+                "A stale notification row changed the surviving selection.");
+            Pass(passed, "terminal-notification-list-" + shell + "-closed-target-no-op");
             Pass(passed, "terminal-attention-" + shell + "-browser-isolation-and-close-cleanup");
             Require(window.LastError is null, "Attention actions reported a native error: " + window.LastError);
         }

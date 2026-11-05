@@ -20,4 +20,5 @@ internal sealed class Strings
     }
     internal string this[string key] => values[key];
     internal string Format(string key, object value) => string.Format(CultureInfo.CurrentCulture, values[key], value);
+    internal string Format(string key, object first, object second) => string.Format(CultureInfo.CurrentCulture, values[key], first, second);
 }

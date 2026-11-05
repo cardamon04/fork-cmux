@@ -7,6 +7,7 @@ internal sealed class DesktopWindow : Form
     private readonly IClipboard clipboard;
     private readonly SessionStore? session;
     private readonly ToolStrip toolbar = new() { GripStyle = ToolStripGripStyle.Hidden };
+    private readonly ToolStripDropDownButton notifications = new() { Name = "Notifications", DisplayStyle = ToolStripItemDisplayStyle.Text };
     private readonly ListBox sidebar = new() { Dock = DockStyle.Left, Width = 180, IntegralHeight = false };
     private readonly Panel content = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel status = new();
@@ -83,6 +84,9 @@ internal sealed class DesktopWindow : Form
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
         AddAction("NextUnread", NextUnread);
+        notifications.Text = notifications.ToolTipText = strings["Notifications"];
+        notifications.DropDownOpening += (_, _) => FillNotifications();
+        toolbar.Items.Add(notifications);
         AddAction("IncreaseFontSize", () => ChangeFontSize("increase"));
         AddAction("DecreaseFontSize", () => ChangeFontSize("decrease"));
         AddAction("ResetFontSize", () => ChangeFontSize("reset"));
@@ -204,12 +208,59 @@ internal sealed class DesktopWindow : Form
         {
             var pane = workspace.Panes.OfType<TerminalPane>().FirstOrDefault(item => item.HasUnread);
             if (pane is null) continue;
-            ActivatePane(workspace, pane);
-            sidebar.SelectedItem = workspace;
-            SelectWorkspace();
-            break;
+            return OpenUnread(pane);
         }
         return Task.CompletedTask;
+    }
+
+    private Task OpenUnread(TerminalPane pane)
+    {
+        if (shuttingDown || closingWindow || pane.IsDisposed || !pane.HasUnread) return Task.CompletedTask;
+        var owner = Workspaces.FirstOrDefault(workspace => workspace.Panes.Contains(pane));
+        if (owner is null) return Task.CompletedTask;
+        var previousFence = selectingWorkspace;
+        selectingWorkspace = true;
+        try
+        {
+            // ActivatePane acknowledges Current. Establish the chosen owner
+            // before it runs, without projecting the owner's previous pane.
+            sidebar.SelectedItem = owner;
+            ActivatePane(owner, pane);
+        }
+        finally { selectingWorkspace = previousFence; }
+        SelectWorkspace();
+        return Task.CompletedTask;
+    }
+
+    private void FillNotifications()
+    {
+        foreach (var item in notifications.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose();
+        notifications.DropDownItems.Clear();
+        if (!shuttingDown && !closingWindow)
+        {
+            foreach (var workspace in Workspaces)
+            foreach (var pane in workspace.Panes.OfType<TerminalPane>().Where(pane => pane.HasUnread))
+            {
+                var label = strings.Format("NotificationTarget", workspace.Title,
+                    strings.Format("NotificationTerminal", workspace.Panes.IndexOf(pane) + 1));
+                var item = new ToolStripMenuItem(label.Replace("&", "&&", StringComparison.Ordinal))
+                {
+                    AccessibleName = label, AccessibleDescription = pane.Title,
+                    ToolTipText = pane.Title.Length == 0 ? label : label + Environment.NewLine + pane.Title,
+                };
+                // Capture the pane the row names, not an index into a list
+                // that later BELs or workspace changes can reorder.
+                item.Click += (_, _) =>
+                {
+                    notifications.HideDropDown();
+                    toolbar.OverflowButton.HideDropDown();
+                    PendingAction = Run(() => OpenUnread(pane));
+                };
+                notifications.DropDownItems.Add(item);
+            }
+        }
+        if (notifications.DropDownItems.Count == 0)
+            notifications.DropDownItems.Add(new ToolStripMenuItem(strings["NoUnreadNotifications"]) { Enabled = false });
     }
 
     private static void SetStatusText(ToolStripStatusLabel label, string text)
