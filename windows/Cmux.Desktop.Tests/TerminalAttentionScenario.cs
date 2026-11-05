@@ -329,6 +329,9 @@ internal static class TerminalAttentionScenario
             {
                 // Command intentionally focuses its source before entering the
                 // gate. Open/capture the menu only after that preparation.
+                var nativeToolbar = window.Controls.OfType<ToolStrip>().Single(item => item is not StatusStrip);
+                Require(nativeToolbar.Focus() && nativeToolbar.ContainsFocus,
+                    "The owned notification fixture toolbar could not acquire native focus.");
                 notifications = OpenNotifications();
                 chosen = notifications.DropDownItems.OfType<ToolStripMenuItem>().Single();
             }, () => notifications.DropDown.Visible && !other.ContainsFocus);
