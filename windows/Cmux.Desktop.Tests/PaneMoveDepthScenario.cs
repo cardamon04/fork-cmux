@@ -10,7 +10,9 @@ internal static class PaneMoveDepthScenario
         var path = Path.Combine(root, "layout.json");
         var deep = new LayoutSnapshot("browser", Url: "about:blank");
         for (var index = 0; index < 16; index++)
-            deep = new("split", Orientation: "horizontal", Ratio: .5,
+            // Keep both native branches measurable; halving sixteen times
+            // reaches a pre-existing zero-size restore limitation.
+            deep = new("split", Orientation: "horizontal", Ratio: .05,
                 First: new("browser", Url: "about:blank"), Second: deep);
         var seed = new SessionSnapshot(1, 2, 0, [
             new("Source", 1, new("split", Orientation: "vertical", Ratio: .5,
