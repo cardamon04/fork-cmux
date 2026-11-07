@@ -57,7 +57,41 @@ internal static class PaneDetachScenario
             Require(destination.Panes.SequenceEqual(new[] { moved }) && destination.Active == moved && destination.Controls[0] == moved,
                 "The destination did not retain the original pane identity.");
             await Program.Command(moved, "Write-Output $global:cmuxDetachValue");
-            await Program.Contains(moved, "DETACH_STATE");
+            try { await Program.Contains(moved, "DETACH_STATE"); }
+            catch
+            {
+                // Observe only after the original deadline failed. Do not add
+                // a pre-move barrier or change the command/assertion timing.
+                try
+                {
+                    Console.WriteLine("DETACH_STATE_NATIVE_FAILURE " + JsonSerializer.Serialize(new
+                    {
+                        fixtureLastError = window.LastError, currentIsDestination = window.Current == destination,
+                        activeIsMoved = destination.Active == moved, moved.ProcessId, moved.IsDisposed,
+                        moved.IsHandleCreated, moved.Visible, moved.ContainsFocus, moved.Width, moved.Height,
+                        parentType = moved.Parent?.GetType().Name, parentWidth = moved.Parent?.Width, parentHeight = moved.Parent?.Height,
+                        sourceCount = original.Panes.Count, destinationCount = destination.Panes.Count,
+                        nativeHandle = moved.IsHandleCreated ? moved.Handle.ToInt64() : 0,
+                        processes = processes.Select(process => new { process.Id, process.HasExited }).ToArray(),
+                    }));
+                    try
+                    {
+                        var controller = typeof(TerminalPane).GetField("controller", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                            ?.GetValue(moved) as Microsoft.Web.WebView2.Core.CoreWebView2Controller;
+                        Console.WriteLine("DETACH_STATE_CONTROLLER_FAILURE " + JsonSerializer.Serialize(new
+                        {
+                            parentWindow = controller?.ParentWindow.ToInt64(), bounds = controller?.Bounds,
+                            visible = controller?.IsVisible, source = controller?.CoreWebView2.Source,
+                        }));
+                    }
+                    catch (Exception diagnostic) { Console.WriteLine("DETACH_STATE_CONTROLLER_DIAGNOSTIC_FAILED " + diagnostic); }
+                    var renderer = await moved.Core.ExecuteScriptAsync("(()=>{const b=term.buffer.active,start=Math.max(0,b.length-600),lines=[];for(let i=start;i<b.length;i++){const line=b.getLine(i);lines.push({index:i,isWrapped:line?.isWrapped,text:line?.translateToString(true)});}return {cols:term.cols,rows:term.rows,innerWidth,innerHeight,focused:document.hasFocus(),activeElement:document.activeElement?.tagName,cursorX:b.cursorX,cursorY:b.cursorY,baseY:b.baseY,viewportY:b.viewportY,bufferLength:b.length,lines};})()").WaitAsync(TimeSpan.FromSeconds(5));
+                    Console.WriteLine("DETACH_STATE_RENDERER_FAILURE " + renderer);
+                    Console.WriteLine("DETACH_STATE_TEXT_FAILURE " + JsonSerializer.Serialize(await Program.Text(moved).WaitAsync(TimeSpan.FromSeconds(5))));
+                }
+                catch (Exception diagnostic) { Console.WriteLine("DETACH_STATE_DIAGNOSTIC_FAILED " + diagnostic); }
+                throw;
+            }
             await window.ClickAction("SplitBelow");
             var added = (TerminalPane)destination.Active!;
             Track(added);
