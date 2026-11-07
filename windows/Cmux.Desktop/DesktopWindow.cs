@@ -8,6 +8,7 @@ internal sealed class DesktopWindow : Form
     private readonly SessionStore? session;
     private readonly ToolStrip toolbar = new() { GripStyle = ToolStripGripStyle.Hidden };
     private readonly ToolStripDropDownButton notifications = new() { Name = "Notifications", DisplayStyle = ToolStripItemDisplayStyle.Text };
+    private readonly ToolStripDropDownButton paneDestinations = new() { Name = "MovePaneToWorkspace", DisplayStyle = ToolStripItemDisplayStyle.Text };
     private readonly ListBox sidebar = new() { Dock = DockStyle.Left, Width = 180, IntegralHeight = false };
     private readonly Panel content = new() { Dock = DockStyle.Fill };
     private readonly ToolStripStatusLabel status = new();
@@ -76,6 +77,9 @@ internal sealed class DesktopWindow : Form
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
         AddAction("OpenBrowser", OpenBrowser);
         AddAction("MovePaneToNewWorkspace", MovePaneToNewWorkspace);
+        paneDestinations.Text = paneDestinations.ToolTipText = strings["MovePaneToWorkspace"];
+        paneDestinations.DropDownOpening += (_, _) => FillPaneDestinations();
+        toolbar.Items.Add(paneDestinations);
         AddAction("ClosePane", ClosePane);
         AddAction("CloseWorkspace", CloseWorkspace);
         AddAction("SaveSession", SaveSession);
@@ -142,6 +146,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
         toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
+        paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 1 } && sidebar.Items.Count > 1;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
         UpdateCaption();
@@ -681,35 +686,101 @@ internal sealed class DesktopWindow : Form
     private Task MovePaneToNewWorkspace()
     {
         if (Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
+        return MovePane(workspace, pane, null);
+    }
+
+    private void FillPaneDestinations()
+    {
+        foreach (var item in paneDestinations.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose();
+        paneDestinations.DropDownItems.Clear();
+        if (shuttingDown || closingWindow || Current is not { Active: { } pane, Panes.Count: > 1 } workspace) return;
+        foreach (var destination in Workspaces.Where(candidate => candidate != workspace))
+        {
+            var label = strings.Format("WorkspaceDestination", sidebar.Items.IndexOf(destination) + 1, destination.Title);
+            var item = new ToolStripMenuItem(label.Replace("&", "&&", StringComparison.Ordinal))
+            {
+                AccessibleName = label, ToolTipText = label,
+            };
+            item.Click += (_, _) =>
+            {
+                paneDestinations.HideDropDown();
+                toolbar.OverflowButton.HideDropDown();
+                PendingAction = Run(() => MovePane(workspace, pane, destination));
+            };
+            paneDestinations.DropDownItems.Add(item);
+        }
+    }
+
+    private Task MovePane(WorkspaceView workspace, WorkspacePane pane, WorkspaceView? destination)
+    {
+        // A drawn row owns its source and destination identities. Never move a
+        // newly selected pane, revive a closed workspace or use a stale index.
+        if (shuttingDown || closingWindow || Current != workspace || workspace.Active != pane || pane.IsDisposed
+            || !Workspaces.Contains(workspace) || workspace.Panes.Count < 2 || !workspace.Panes.Contains(pane)) return Task.CompletedTask;
+        var target = destination?.Active;
+        if (destination is not null && (destination == workspace || destination.IsDisposed || !Workspaces.Contains(destination)
+            || target is null || target.IsDisposed || target.Parent is null || !destination.Panes.Contains(target))) return Task.CompletedTask;
         var location = LocatePane(workspace, pane);
-        // The hidden destination has a temporary small size while reparenting.
-        // Publish only the committed or restored viewport to the live ConPTY.
+        var targetParent = target?.Parent;
+        // Publish only the committed or restored viewports to the live shells.
         using var viewport = (pane as TerminalPane)?.DeferViewportLayout();
+        using var targetViewport = (target as TerminalPane)?.DeferViewportLayout();
         var sequence = workspaceSequence + 1;
-        var destination = new WorkspaceView(strings.Format("Workspace", sequence)) { Dock = DockStyle.Fill, Visible = false };
+        var creating = destination is null;
+        destination ??= new WorkspaceView(strings.Format("Workspace", sequence)) { Dock = DockStyle.Fill, Visible = false };
+        var split = target is null ? null : new SplitContainer
+        {
+            Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0,
+        };
         var previousFence = selectingWorkspace;
         selectingWorkspace = true;
         try
         {
-            content.Controls.Add(destination);
-            sidebar.Items.Add(destination);
+            if (creating)
+            {
+                content.Controls.Add(destination);
+                sidebar.Items.Add(destination);
+            }
             DetachPane(location);
-            destination.Controls.Add(pane);
+            if (split is not null)
+            {
+                targetParent!.Controls.Remove(target!);
+                targetParent.Controls.Add(split);
+                split.Panel1.Controls.Add(target!);
+                split.Panel2.Controls.Add(pane);
+                destination.PendingRatios[split] = .5;
+            }
+            else destination.Controls.Add(pane);
             destination.Panes.Add(pane);
-            destination.Active = pane;
-            ActivatePane(workspace, workspace.Panes[0]);
+            // Establish Current before either activation can acknowledge focus.
             sidebar.SelectedItem = destination;
-            workspaceSequence = sequence;
+            ActivatePane(destination, pane);
+            ActivatePane(workspace, workspace.Panes[0]);
+            if (creating) workspaceSequence = sequence;
         }
         catch
         {
-            // Keep the original split alive until adoption commits, so a
-            // native reparent failure can restore the exact live resources.
-            destination.Panes.Clear();
+            destination.Panes.Remove(pane);
+            pane.Parent?.Controls.Remove(pane);
+            if (split is not null)
+            {
+                // Empty the failed wrapper before disposing it; the browser,
+                // destination shell and moved shell are still live resources.
+                target!.Parent?.Controls.Remove(target);
+                split.Parent?.Controls.Remove(split);
+                targetParent!.Controls.Add(target);
+                destination.PendingRatios.Remove(split);
+                destination.Active = target;
+                destination.SelectionRevision++;
+                split.Dispose();
+            }
             RestorePane(location);
-            content.Controls.Remove(destination);
-            sidebar.Items.Remove(destination);
-            destination.Dispose();
+            if (creating)
+            {
+                content.Controls.Remove(destination);
+                sidebar.Items.Remove(destination);
+                destination.Dispose();
+            }
             sidebar.SelectedItem = workspace;
             ActivatePane(workspace, pane);
             throw;
@@ -721,6 +792,7 @@ internal sealed class DesktopWindow : Form
         }
         location.Split.Dispose();
         RefreshAttention(workspace);
+        RefreshAttention(destination);
         if (pane is BrowserPane browser) browser.FocusAddress();
         return Task.CompletedTask;
     }

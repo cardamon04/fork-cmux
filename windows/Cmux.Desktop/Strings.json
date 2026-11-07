@@ -71,7 +71,9 @@
     "Notifications": "Unread notifications",
     "NoUnreadNotifications": "No unread notifications",
     "NotificationTerminal": "Terminal {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "Move pane to workspace",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -145,7 +147,9 @@
     "Notifications": "未読通知",
     "NoUnreadNotifications": "未読通知はありません",
     "NotificationTerminal": "端末 {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "既存ワークスペースへペインを移動",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -219,7 +223,9 @@
     "Notifications": "Ungelesene Benachrichtigungen",
     "NoUnreadNotifications": "Keine ungelesenen Benachrichtigungen",
     "NotificationTerminal": "Terminalbereich {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "Bereich in Arbeitsbereich verschieben",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -293,7 +299,9 @@
     "Notifications": "Notifications non lues",
     "NoUnreadNotifications": "Aucune notification non lue",
     "NotificationTerminal": "Terminal n° {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "Déplacer le panneau vers un espace de travail",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -367,7 +375,9 @@
     "Notifications": "الإشعارات غير المقروءة",
     "NoUnreadNotifications": "لا توجد إشعارات غير مقروءة",
     "NotificationTerminal": "الطرفية {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "نقل اللوحة إلى مساحة عمل",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -441,7 +451,9 @@
     "Notifications": "Notificaciones sin leer",
     "NoUnreadNotifications": "No hay notificaciones sin leer",
     "NotificationTerminal": "Terminal n.º {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "Mover panel a un espacio de trabajo",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -515,7 +527,9 @@
     "Notifications": "未讀通知",
     "NoUnreadNotifications": "沒有未讀通知",
     "NotificationTerminal": "終端 {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "將窗格移至工作區",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -589,7 +603,9 @@
     "Notifications": "未读通知",
     "NoUnreadNotifications": "没有未读通知",
     "NotificationTerminal": "终端 {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "将窗格移至工作区",
+    "WorkspaceDestination": "{0}: {1}"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -663,6 +679,8 @@
     "Notifications": "읽지 않은 알림",
     "NoUnreadNotifications": "읽지 않은 알림이 없습니다",
     "NotificationTerminal": "터미널 {0}",
-    "NotificationTarget": "{0} — {1}"
+    "NotificationTarget": "{0} — {1}",
+    "MovePaneToWorkspace": "다른 작업 공간으로 창 이동",
+    "WorkspaceDestination": "{0}: {1}"
   }
 }
