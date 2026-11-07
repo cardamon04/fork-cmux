@@ -485,6 +485,7 @@ internal static class Program
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await PaneMoveScenario.Run(shell, passed);
                 await GitStatusScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 Require(window.LastError is null, "The product reported an error: " + window.LastError);
                 Require(uiErrors.Count == 0, "An exception reached native UI dispatch.");
