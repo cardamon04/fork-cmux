@@ -238,7 +238,12 @@ internal sealed class BrowserPane : WorkspacePane
     {
         if (stopped) return;
         if (failed) Select();
-        else { address.Focus(); address.SelectAll(); }
+        else
+        {
+            if (address.IsOnOverflow) navigation.OverflowButton.ShowDropDown();
+            address.Focus();
+            address.SelectAll();
+        }
         NotifyActivated();
     }
 

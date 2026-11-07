@@ -3,6 +3,7 @@ namespace Cmux.Desktop;
 internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int SelectedWorkspace, WorkspaceSnapshot[] Workspaces)
 {
     internal const int CurrentVersion = 1;
+    internal const int MaxLayoutDepth = 16;
     internal const int MaxBytes = 1024 * 1024;
 
     internal void Validate()
@@ -22,7 +23,7 @@ internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int S
 
     private static int ValidateNode(LayoutSnapshot? node, int depth, ref int total)
     {
-        if (node is null || depth > 16) throw new InvalidDataException();
+        if (node is null || depth > MaxLayoutDepth) throw new InvalidDataException();
         if (node.Kind == "split")
         {
             if (node.Directory is not null || node.Url is not null || node.Orientation is not ("vertical" or "horizontal")

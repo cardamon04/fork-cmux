@@ -78,6 +78,7 @@ internal sealed class DesktopWindow : Form
         AddAction("OpenBrowser", OpenBrowser);
         AddAction("MovePaneToNewWorkspace", MovePaneToNewWorkspace);
         paneDestinations.Text = paneDestinations.ToolTipText = strings["MovePaneToWorkspace"];
+        paneDestinations.DropDown.ShowItemToolTips = true;
         paneDestinations.DropDownOpening += (_, _) => FillPaneDestinations();
         toolbar.Items.Add(paneDestinations);
         AddAction("ClosePane", ClosePane);
@@ -694,12 +695,18 @@ internal sealed class DesktopWindow : Form
         foreach (var item in paneDestinations.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose();
         paneDestinations.DropDownItems.Clear();
         if (shuttingDown || closingWindow || Current is not { Active: { } pane, Panes.Count: > 1 } workspace) return;
-        foreach (var destination in Workspaces.Where(candidate => candidate != workspace))
+        var index = 0;
+        foreach (var destination in Workspaces)
         {
-            var label = strings.Format("WorkspaceDestination", sidebar.Items.IndexOf(destination) + 1, destination.Title);
+            index++;
+            if (destination == workspace) continue;
+            var label = strings.Format("WorkspaceDestination", index, destination.Title);
+            var allowed = CanReceivePane(destination);
             var item = new ToolStripMenuItem(label.Replace("&", "&&", StringComparison.Ordinal))
             {
-                AccessibleName = label, ToolTipText = label,
+                AccessibleName = label, Enabled = allowed,
+                AccessibleDescription = allowed ? label : strings["MovePaneDepthLimit"],
+                ToolTipText = allowed ? label : strings["MovePaneDepthLimit"],
             };
             item.Click += (_, _) =>
             {
@@ -711,6 +718,21 @@ internal sealed class DesktopWindow : Form
         }
     }
 
+    private static bool CanReceivePane(WorkspaceView destination)
+    {
+        if (destination.IsDisposed || destination.Active is not { } target
+            || target.IsDisposed || !destination.Panes.Contains(target)) return false;
+        Control? control = target.Parent;
+        var depth = 0;
+        while (control is not WorkspaceView)
+        {
+            if (control is null) return false;
+            if (control is SplitContainer && ++depth >= SessionSnapshot.MaxLayoutDepth) return false;
+            control = control.Parent;
+        }
+        return control == destination;
+    }
+
     private Task MovePane(WorkspaceView workspace, WorkspacePane pane, WorkspaceView? destination)
     {
         // A drawn row owns its source and destination identities. Never move a
@@ -718,8 +740,8 @@ internal sealed class DesktopWindow : Form
         if (shuttingDown || closingWindow || Current != workspace || workspace.Active != pane || pane.IsDisposed
             || !Workspaces.Contains(workspace) || workspace.Panes.Count < 2 || !workspace.Panes.Contains(pane)) return Task.CompletedTask;
         var target = destination?.Active;
-        if (destination is not null && (destination == workspace || destination.IsDisposed || !Workspaces.Contains(destination)
-            || target is null || target.IsDisposed || target.Parent is null || !destination.Panes.Contains(target))) return Task.CompletedTask;
+        if (destination is not null && (destination == workspace || !Workspaces.Contains(destination)
+            || !CanReceivePane(destination))) return Task.CompletedTask;
         var location = LocatePane(workspace, pane);
         var targetParent = target?.Parent;
         // Publish only the committed or restored viewports to the live shells.
