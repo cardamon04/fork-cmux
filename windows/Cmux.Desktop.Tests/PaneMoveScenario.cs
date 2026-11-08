@@ -137,7 +137,7 @@ internal static class PaneMoveScenario
                 && sidebar.GetItemText(sidebar.Items[destinationIndex]) == new Strings().Format("UnreadWorkspace", duplicate),
                 "A moved BEL marked its former workspace or missed its new workspace.");
             Pass("real-bell-current-owner-after-transfer", shell, passed);
-            Require(!Toolbar(window).Items["MovePaneToWorkspace"]!.Enabled, "A sole source pane offered a split-only transfer.");
+            Require(Toolbar(window).Items["MovePaneToWorkspace"]!.Enabled, "A sole source pane lost its existing-workspace destination.");
             await window.ClickAction("CloseWorkspace");
             Require(processes[remaining].WaitForExit(0) && !processes[moved].WaitForExit(0)
                 && await core.ExecuteScriptAsync("++window.browserMoveState") == "43", "Closing the source ended a transferred live resource.");
