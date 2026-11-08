@@ -147,7 +147,7 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
         toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
-        paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 1 } && sidebar.Items.Count > 1;
+        paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 0 } && sidebar.Items.Count > 1;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
         UpdateCaption();
@@ -651,11 +651,13 @@ internal sealed class DesktopWindow : Form
         }
     }
 
-    private sealed record PaneLocation(WorkspaceView Workspace, WorkspacePane Pane, SplitContainer Split,
-        SplitterPanel Panel, Control Sibling, Control Parent, int Index, double Ratio);
+    private sealed record PaneLocation(WorkspaceView Workspace, WorkspacePane Pane, SplitContainer? Split,
+        SplitterPanel? Panel, Control? Sibling, Control Parent, int Index, double Ratio);
 
     private static PaneLocation LocatePane(WorkspaceView workspace, WorkspacePane pane)
     {
+        if (workspace.Panes.Count == 1 && pane.Parent == workspace)
+            return new(workspace, pane, null, null, null, workspace, 0, .5);
         var panel = (SplitterPanel)pane.Parent!;
         var split = (SplitContainer)panel.Parent!;
         var sibling = (panel == split.Panel1 ? split.Panel2 : split.Panel1).Controls[0];
@@ -666,22 +668,38 @@ internal sealed class DesktopWindow : Form
     {
         // The removed split still owns the pane until a live destination
         // adopts it, or ClosePane disposes that split and its child controls.
-        location.Sibling.Parent!.Controls.Remove(location.Sibling);
-        location.Parent.Controls.Remove(location.Split);
-        location.Parent.Controls.Add(location.Sibling);
+        if (location.Split is { } split)
+        {
+            var sibling = location.Sibling!;
+            sibling.Parent!.Controls.Remove(sibling);
+            location.Parent.Controls.Remove(split);
+            location.Parent.Controls.Add(sibling);
+            location.Workspace.PendingRatios.Remove(split);
+        }
+        // A sole pane likewise stays under its original container until the
+        // destination adopts it. Removing the workspace is a commit step.
         location.Workspace.Panes.Remove(location.Pane);
-        location.Workspace.PendingRatios.Remove(location.Split);
     }
 
     private static void RestorePane(PaneLocation location)
     {
-        location.Pane.Parent?.Controls.Remove(location.Pane);
-        location.Sibling.Parent?.Controls.Remove(location.Sibling);
-        location.Parent.Controls.Add(location.Split);
-        location.Panel.Controls.Add(location.Pane);
-        (location.Panel == location.Split.Panel1 ? location.Split.Panel2 : location.Split.Panel1).Controls.Add(location.Sibling);
+        if (location.Split is { } split)
+        {
+            var panel = location.Panel!;
+            var sibling = location.Sibling!;
+            location.Pane.Parent?.Controls.Remove(location.Pane);
+            sibling.Parent?.Controls.Remove(sibling);
+            location.Parent.Controls.Add(split);
+            panel.Controls.Add(location.Pane);
+            (panel == split.Panel1 ? split.Panel2 : split.Panel1).Controls.Add(sibling);
+            location.Workspace.PendingRatios[split] = location.Ratio;
+        }
+        else if (location.Pane.Parent != location.Parent)
+        {
+            location.Pane.Parent?.Controls.Remove(location.Pane);
+            location.Parent.Controls.Add(location.Pane);
+        }
         if (!location.Workspace.Panes.Contains(location.Pane)) location.Workspace.Panes.Insert(location.Index, location.Pane);
-        location.Workspace.PendingRatios[location.Split] = location.Ratio;
     }
 
     private Task MovePaneToNewWorkspace()
@@ -694,7 +712,7 @@ internal sealed class DesktopWindow : Form
     {
         foreach (var item in paneDestinations.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose();
         paneDestinations.DropDownItems.Clear();
-        if (shuttingDown || closingWindow || Current is not { Active: { } pane, Panes.Count: > 1 } workspace) return;
+        if (shuttingDown || closingWindow || Current is not { Active: { } pane, Panes.Count: > 0 } workspace) return;
         var index = 0;
         foreach (var destination in Workspaces)
         {
@@ -738,11 +756,13 @@ internal sealed class DesktopWindow : Form
         // A drawn row owns its source and destination identities. Never move a
         // newly selected pane, revive a closed workspace or use a stale index.
         if (shuttingDown || closingWindow || Current != workspace || workspace.Active != pane || pane.IsDisposed
-            || !Workspaces.Contains(workspace) || workspace.Panes.Count < 2 || !workspace.Panes.Contains(pane)) return Task.CompletedTask;
+            || !Workspaces.Contains(workspace) || !workspace.Panes.Contains(pane)
+            || destination is null && workspace.Panes.Count < 2) return Task.CompletedTask;
         var target = destination?.Active;
         if (destination is not null && (destination == workspace || !Workspaces.Contains(destination)
             || !CanReceivePane(destination))) return Task.CompletedTask;
         var location = LocatePane(workspace, pane);
+        var sourceIndex = sidebar.Items.IndexOf(workspace);
         var targetParent = target?.Parent;
         // Publish only the committed or restored viewports to the live shells.
         using var viewport = (pane as TerminalPane)?.DeferViewportLayout();
@@ -777,13 +797,19 @@ internal sealed class DesktopWindow : Form
             // Establish Current before either activation can acknowledge focus.
             sidebar.SelectedItem = destination;
             ActivatePane(destination, pane);
-            ActivatePane(workspace, workspace.Panes[0]);
+            if (workspace.Panes.Count == 0)
+            {
+                workspace.Active = null;
+                workspace.SelectionRevision++;
+                DetachWorkspace(workspace);
+            }
+            else ActivatePane(workspace, workspace.Panes[0]);
             if (creating) workspaceSequence = sequence;
         }
         catch
         {
             destination.Panes.Remove(pane);
-            pane.Parent?.Controls.Remove(pane);
+            if (location.Split is not null || pane.Parent != workspace) pane.Parent?.Controls.Remove(pane);
             if (split is not null)
             {
                 // Empty the failed wrapper before disposing it; the browser,
@@ -795,6 +821,13 @@ internal sealed class DesktopWindow : Form
                 destination.Active = target;
                 destination.SelectionRevision++;
                 split.Dispose();
+            }
+            if (location.Split is null)
+            {
+                // Keep the original container alive until commit, including
+                // failures partway through native/sidebar removal.
+                if (!content.Controls.Contains(workspace)) content.Controls.Add(workspace);
+                if (!sidebar.Items.Contains(workspace)) sidebar.Items.Insert(sourceIndex, workspace);
             }
             RestorePane(location);
             if (creating)
@@ -812,7 +845,8 @@ internal sealed class DesktopWindow : Form
             selectingWorkspace = previousFence;
             SelectWorkspace();
         }
-        location.Split.Dispose();
+        if (location.Split is { } removedSplit) removedSplit.Dispose();
+        else workspace.Dispose();
         RefreshAttention(workspace);
         RefreshAttention(destination);
         if (pane is BrowserPane browser) browser.FocusAddress();
@@ -827,7 +861,7 @@ internal sealed class DesktopWindow : Form
         DetachPane(location);
         ActivatePane(workspace, workspace.Panes[0]);
         await pane.DisposeAsync();
-        location.Split.Dispose();
+        location.Split!.Dispose();
         workspace.Active.FocusPane();
         RefreshAttention(workspace);
         UpdateActions();
@@ -845,13 +879,18 @@ internal sealed class DesktopWindow : Form
         foreach (var pane in workspace.Panes)
             try { await pane.DisposeAsync(); } catch (Exception error) { failure ??= error; }
         workspace.Panes.Clear();
-        content.Controls.Remove(workspace);
         var index = sidebar.Items.IndexOf(workspace);
-        sidebar.Items.Remove(workspace);
+        DetachWorkspace(workspace);
         workspace.Dispose();
         if (sidebar.Items.Count > 0) sidebar.SelectedIndex = Math.Min(index, sidebar.Items.Count - 1);
         UpdateActions();
         if (failure is not null) throw failure;
+    }
+
+    private void DetachWorkspace(WorkspaceView workspace)
+    {
+        content.Controls.Remove(workspace);
+        sidebar.Items.Remove(workspace);
     }
 
     internal async Task Shutdown()
