@@ -1,10 +1,10 @@
 # Windows実装の到達点と残作業
 
-2026-11-08時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#23に対する整理です。各PRは未マージで、#23は#22に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-09時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#24に対する整理です。各PRは未マージで、#24は#23に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
-| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）、既存workspaceへのlive split pane移動（#22）、最後のlive paneの移動と空sourceの破棄（#23）。大小文字だけの名前変更もnative行と一致（#18） | 複数paneのworkspace一括merge、drag/drop、pin/group、複数window、本家操作の全比較 |
+| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）、既存workspaceへのlive split pane移動（#22）、最後のlive paneの移動と空sourceの破棄（#23）、通常分割の保存深度境界（#24）。大小文字だけの名前変更もnative行と一致（#18） | 複数paneのworkspace一括merge、drag/drop、pin/group、複数window、本家操作の全比較 |
 | F-02 | ConPTY、両PowerShell、検索、Unicode入力、CWD、CDP composition、font zoom（#1/#3/#6/#7/#8/#13/#16）。空selectionの検索入力でもCopyを端末出力から分離（#19） | 実OS IME、実PC GUI、全描画/protocol互換、WSL/SSH。pwsh過去prompt表示差は未解決 |
 | F-03 | local CWD、Git branch/切り離されたHEAD（#7/#10） | PR・port・最新通知、remote作業先 |
 | F-04 | 端末BELのin-app未読・強調・移動（#17）、未読端末の一覧と行選択（#21） | agent hook/CLI受信、通知本文・既読履歴、一覧のdigit shortcut、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
@@ -29,11 +29,15 @@
 
 ## 次の独立単位を選ぶ理由
 
+#24はF-01/F-10の通常分割で保存深度16を超える経路を修正します。新機能より、既存layoutが保存できなくなる不具合を優先します。縦・横分割、browser追加とworkspaceへの移動先判定が深度・所有権を共有し、深い枝だけを拒否します。浅いpaneやclose後の分割を妨げず、schemaや履歴範囲は変えません。別のworkspace数・全体pane数・保存bytes境界はこの単位の対象外です。[再現・修正範囲と本家32 commitsの評価](windows-split-depth.md)に記録します。
+
+## 直前の最後のpane移動
+
 #23はF-01の最後の1ペインを既存workspaceへ移す操作です。通常のworkspaceをまとめるために不要なsplitを作る制限を取り除きます。native adoption失敗では元workspaceを保ち、成功後だけ空containerを破棄します。#22のtransactionと通常closeのcontainer切り離しを共有し、新規workspaceへの移動条件・schema・history範囲は維持します。認証・履歴回答・前面操作や#20の再開に依存しません。[比較元の動作、本家6 commitsの影響と検証範囲](windows-last-pane-transfer.md)を記録します。
 
 ## 直前のpane移動
 
-#22はF-01の既存workspaceへの移動を扱います。liveなterminal/browserを新規workspaceへ分けるだけでなく、既存の作業先へまとめ直す操作です。移動先の選択paneの右へ配置し、元のsplitをたたみます。認証・履歴仕様・実PC前面操作に依存せず、#20の修正再開も必要ありません。表示済みのsource paneとdestination workspaceを保持し、stale行は現在のowner・選択・生存を検証して拒否します。新規workspaceへの移動と同じtransactionでnative reparent失敗を戻し、既存の保存schemaを使います。sole paneのworkspace全体移動は未実装として残します。
+#22はF-01の既存workspaceへの移動を扱います。liveなterminal/browserを新規workspaceへ分けるだけでなく、既存の作業先へまとめ直す操作です。移動先の選択paneの右へ配置し、元のsplitをたたみます。認証・履歴仕様・実PC前面操作に依存せず、#20の修正再開も必要ありません。表示済みのsource paneとdestination workspaceを保持し、stale行は現在のowner・選択・生存を検証して拒否します。新規workspaceへの移動と同じtransactionでnative reparent失敗を戻し、既存の保存schemaを使います。当時未実装だった最後のpaneの移動は#23で追加しています。複数paneの一括mergeは未実装です。
 
 開始時の本家mainは`be5e24339c6eabb8e929a7029c4e6f834e257c97`です。前回`407c048a`以降の31 commitsを[今回の差分評価](windows-pane-transfer.md)に記録します。CI・実動作・独立レビューの最終HEADはPR #22で確認します。
 

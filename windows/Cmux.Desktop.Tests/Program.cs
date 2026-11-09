@@ -484,6 +484,7 @@ internal static class Program
                 await TerminalAttentionScenario.Run(shell, passed);
                 await WorkspaceRenameScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await WorkspaceOrderScenario.Run(shell, passed, args.ElementAtOrDefault(0));
+                await SplitDepthScenario.Run(shell, passed);
                 await LastPaneTransferScenario.Run(shell, passed);
                 await PaneDetachScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await PaneMoveDepthScenario.Run(shell, passed);
