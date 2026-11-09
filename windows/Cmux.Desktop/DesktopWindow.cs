@@ -148,6 +148,9 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
         toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
         paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 0 } && sidebar.Items.Count > 1;
+        var canSplit = Current is { Active: { } selected } current && CanSplitPane(current, selected);
+        toolbar.Items["SplitRight"]!.Enabled = toolbar.Items["SplitBelow"]!.Enabled = canSplit;
+        toolbar.Items["OpenBrowser"]!.Enabled = Current is null || canSplit;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
         UpdateCaption();
@@ -618,7 +621,7 @@ internal sealed class DesktopWindow : Form
 
     private async Task Split(Orientation orientation, PaneKind kind)
     {
-        if (Current is not { Active: { } previous } workspace) return;
+        if (Current is not { Active: { } previous } workspace || !CanSplitPane(workspace, previous)) return;
         var parent = previous.Parent!;
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = orientation, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
         var paneLaunch = previous is TerminalPane terminal && kind == PaneKind.Terminal
@@ -736,11 +739,12 @@ internal sealed class DesktopWindow : Form
         }
     }
 
-    private static bool CanReceivePane(WorkspaceView destination)
+    private static bool CanReceivePane(WorkspaceView destination) => destination.Active is { } target && CanSplitPane(destination, target);
+
+    private static bool CanSplitPane(WorkspaceView workspace, WorkspacePane pane)
     {
-        if (destination.IsDisposed || destination.Active is not { } target
-            || target.IsDisposed || !destination.Panes.Contains(target)) return false;
-        Control? control = target.Parent;
+        if (workspace.IsDisposed || pane.IsDisposed || !workspace.Panes.Contains(pane)) return false;
+        Control? control = pane.Parent;
         var depth = 0;
         while (control is not WorkspaceView)
         {
@@ -748,7 +752,7 @@ internal sealed class DesktopWindow : Form
             if (control is SplitContainer && ++depth >= SessionSnapshot.MaxLayoutDepth) return false;
             control = control.Parent;
         }
-        return control == destination;
+        return control == workspace;
     }
 
     private Task MovePane(WorkspaceView workspace, WorkspacePane pane, WorkspaceView? destination)
