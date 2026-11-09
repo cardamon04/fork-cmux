@@ -16,7 +16,7 @@ internal static class SplitDepthScenario
         var path = Path.Combine(root, "layout.json");
         var launch = source with { Directory = root, Arguments = ShellLaunch.PowerShellArguments(source.Arguments[^1], noProfile: true) };
         LayoutSnapshot Branch(int depth) => depth == 0 ? new("terminal", Directory: root)
-            : new("split", Orientation: "vertical", Ratio: 0, First: new("browser", Url: "about:blank"), Second: Branch(depth - 1));
+            : new("split", Orientation: "vertical", Ratio: .05, First: new("browser", Url: "about:blank"), Second: Branch(depth - 1));
         var seed = new SessionSnapshot(1, 1, 0, [new("Depth boundary", SessionSnapshot.MaxLayoutDepth - 1, Branch(SessionSnapshot.MaxLayoutDepth - 1))]);
         seed.Validate();
         using (var store = new SessionStore(path)) { _ = store.Open(); store.Save(seed); }
@@ -84,11 +84,18 @@ internal static class SplitDepthScenario
             Pass("native-actions-disabled-without-mutation");
 
             shallow.FocusPane();
-            await shallow.Core.ExecuteScriptAsync("window.cmuxDepthState=41");
+            Require(shallow.Width > 0 && shallow.Height > 0, "The private shallow browser has no measurable native viewport.");
+            await Program.Until(() => Task.FromResult(shallow.ContainsFocus), "The private shallow browser never owned native focus.");
+            var shallowCore = shallow.Core;
+            Require(await shallowCore.ExecuteScriptAsync("window.cmuxDepthState=41") == "41", "The private shallow browser state was not initialized.");
             Require(window.IsActionEnabled("SplitRight") && window.IsActionEnabled("SplitBelow") && window.IsActionEnabled("OpenBrowser"), "A deep branch globally disabled splitting a shallow browser.");
             await window.ClickAction("OpenBrowser");
-            var addedBrowser = (BrowserPane)workspace.Active!;
-            Require(addedBrowser != shallow && await shallow.Core.ExecuteScriptAsync("++window.cmuxDepthState") == "42", "Splitting a shallow browser recreated its live page.");
+            var addedBrowser = workspace.Active as BrowserPane;
+            var retainedState = await shallowCore.ExecuteScriptAsync("++window.cmuxDepthState");
+            Console.WriteLine("SPLIT_DEPTH_SHALLOW " + JsonSerializer.Serialize(new { shell, width = shallow.Width, height = shallow.Height,
+                selection = workspace.Active?.GetType().Name, newBrowser = addedBrowser is not null && addedBrowser != shallow,
+                sameCore = ReferenceEquals(shallow.Core, shallowCore), retainedState, error = window.LastError }));
+            Require(addedBrowser is not null && addedBrowser != shallow && ReferenceEquals(shallow.Core, shallowCore) && retainedState == "42", "Splitting a shallow browser recreated its live page.");
             deepest.FocusPane();
             Require(!window.IsActionEnabled("OpenBrowser"), "Returning to the deep leaf retained shallow-pane action availability.");
             original.FocusPane(); await Program.Command(original, "Write-Output $global:cmuxDepthMemory"); await Program.Contains(original, "DEPTH_LIVE");
