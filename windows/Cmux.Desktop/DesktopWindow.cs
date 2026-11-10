@@ -146,11 +146,13 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["RenameWorkspace"]!.Enabled = Current is not null;
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
-        toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
+        var canCreate = CanCreateWorkspace();
+        toolbar.Items["NewWorkspace"]!.Enabled = canCreate;
+        toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = canCreate && Current is { Active: not null, Panes.Count: > 1 };
         paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 0 } && sidebar.Items.Count > 1;
         var canSplit = Current is { Active: { } selected } current && CanSplitPane(current, selected);
         toolbar.Items["SplitRight"]!.Enabled = toolbar.Items["SplitBelow"]!.Enabled = canSplit;
-        toolbar.Items["OpenBrowser"]!.Enabled = Current is null || canSplit;
+        toolbar.Items["OpenBrowser"]!.Enabled = Current is null ? canCreate : canSplit;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
         UpdateCaption();
@@ -522,8 +524,12 @@ internal sealed class DesktopWindow : Form
 
     internal Task NewWorkspace() => NewWorkspace(PaneKind.Terminal);
 
+    private bool CanCreateWorkspace() => sidebar.Items.Count < SessionSnapshot.MaxWorkspaces
+        && workspaceSequence < SessionSnapshot.MaxWorkspaceSequence;
+
     private async Task NewWorkspace(PaneKind kind)
     {
+        if (!CanCreateWorkspace()) return;
         var workspace = new WorkspaceView(strings.Format("Workspace", ++workspaceSequence)) { Dock = DockStyle.Fill };
         content.Controls.Add(workspace);
         sidebar.Items.Add(workspace);
@@ -707,7 +713,7 @@ internal sealed class DesktopWindow : Form
 
     private Task MovePaneToNewWorkspace()
     {
-        if (Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
+        if (!CanCreateWorkspace() || Current is not { Active: { } pane } workspace || workspace.Panes.Count < 2) return Task.CompletedTask;
         return MovePane(workspace, pane, null);
     }
 
@@ -761,7 +767,7 @@ internal sealed class DesktopWindow : Form
         // newly selected pane, revive a closed workspace or use a stale index.
         if (shuttingDown || closingWindow || Current != workspace || workspace.Active != pane || pane.IsDisposed
             || !Workspaces.Contains(workspace) || !workspace.Panes.Contains(pane)
-            || destination is null && workspace.Panes.Count < 2) return Task.CompletedTask;
+            || destination is null && (workspace.Panes.Count < 2 || !CanCreateWorkspace())) return Task.CompletedTask;
         var target = destination?.Active;
         if (destination is not null && (destination == workspace || !Workspaces.Contains(destination)
             || !CanReceivePane(destination))) return Task.CompletedTask;
