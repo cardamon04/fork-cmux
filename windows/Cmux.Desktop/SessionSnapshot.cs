@@ -3,13 +3,15 @@ namespace Cmux.Desktop;
 internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int SelectedWorkspace, WorkspaceSnapshot[] Workspaces)
 {
     internal const int CurrentVersion = 1;
+    internal const int MaxWorkspaces = 64;
+    internal const int MaxWorkspaceSequence = int.MaxValue - 1;
     internal const int MaxLayoutDepth = 16;
     internal const int MaxBytes = 1024 * 1024;
 
     internal void Validate()
     {
-        if (Version != CurrentVersion || WorkspaceSequence < 0 || WorkspaceSequence == int.MaxValue
-            || Workspaces is null || Workspaces.Length > 64 || WorkspaceSequence < Workspaces.Length
+        if (Version != CurrentVersion || WorkspaceSequence < 0 || WorkspaceSequence > MaxWorkspaceSequence
+            || Workspaces is null || Workspaces.Length > MaxWorkspaces || WorkspaceSequence < Workspaces.Length
             || (Workspaces.Length == 0 ? SelectedWorkspace != -1 : SelectedWorkspace < 0 || SelectedWorkspace >= Workspaces.Length))
             throw new InvalidDataException();
         var total = 0;
