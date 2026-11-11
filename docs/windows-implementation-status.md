@@ -1,10 +1,10 @@
 # Windows実装の到達点と残作業
 
-2026-11-10時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#25に対する整理です。各PRは未マージで、#25は#24に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-11時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#26に対する整理です。各PRは未マージで、#26は#25に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
-| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）、既存workspaceへのlive split pane移動（#22）、最後のlive paneの移動と空sourceの破棄（#23）、通常分割の保存深度境界（#24）、workspace作成の既存保存件数・採番境界（#25）。大小文字だけの名前変更もnative行と一致（#18） | 複数paneのworkspace一括merge、drag/drop、pin/group、複数window、本家操作の全比較 |
+| F-01 | 作成・選択・終了、分割・リサイズ、名前・順序、live pane移動（#3/#9/#11/#12）、既存workspaceへのlive split pane移動（#22）、最後のlive paneの移動と空sourceの破棄（#23）、通常分割の保存深度境界（#24）、workspace作成の既存保存件数・採番境界（#25）、追加操作の全体256ペイン境界（#26）。大小文字だけの名前変更もnative行と一致（#18） | 複数paneのworkspace一括merge、drag/drop、pin/group、複数window、本家操作の全比較 |
 | F-02 | ConPTY、両PowerShell、検索、Unicode入力、CWD、CDP composition、font zoom（#1/#3/#6/#7/#8/#13/#16）。空selectionの検索入力でもCopyを端末出力から分離（#19） | 実OS IME、実PC GUI、全描画/protocol互換、WSL/SSH。pwsh過去prompt表示差は未解決 |
 | F-03 | local CWD、Git branch/切り離されたHEAD（#7/#10） | PR・port・最新通知、remote作業先 |
 | F-04 | 端末BELのin-app未読・強調・移動（#17）、未読端末の一覧と行選択（#21） | agent hook/CLI受信、通知本文・既読履歴、一覧のdigit shortcut、Windows toast、音、phone転送。BEL部分だけで全通知合格にしない |
@@ -29,7 +29,7 @@
 
 ## 今の独立単位を選ぶ理由
 
-#25はF-01/F-10の保存可能性を守る修正です。64個のworkspace、または最後の有効な採番値からの作成で、保存形式を超えるlive状態になる問題を修正前の両PowerShellで再現しました。通常作成・空状態からのbrowser作成・新workspaceへのpane移動が同じ上限を確認します。既存workspaceへの移動や現在のworkspace内の分割は維持します。件数はcloseで回復し、採番はリセットしません。全体pane数256・保存bytesの操作時境界、64個のlive engineを同時起動する負荷試験は今回の対象外です。[再現・修正範囲と本家31 commitsの評価](windows-workspace-capacity.md)を参照してください。
+#26はF-01/F-10の保存整合性を守る修正です。全体256ペインの保存可能なnative graphから、workspace作成・通常分割で257ペインへ増えて保存検証に失敗する経路を両PowerShellで再現しました。通常workspace作成・terminal/browser分割が同じ追加上限を確認し、native actionも同じ判定を使います。既存ペインを新workspaceや既存workspaceへ移す操作は、ペイン数が増えないため維持します。closeで1個空けば再び追加でき、schema・履歴範囲・既存workspace数/採番/深度の制約は変えません。bytes上限は別課題です。少数の実エンジンと未起動モデルによるgraph検証で、256 live engineやGUI復元の受入とは区別します。[再現・検証範囲と本家42コミットの評価](windows-pane-capacity.md)を参照してください。
 
 ## 直前の最後のpane移動
 
