@@ -171,6 +171,7 @@ internal static class PaneCapacityScenario
         internal BrowserPane Browser = null!;
         internal readonly int InitialPanes;
         private readonly List<BrowserPane> models = [];
+        private readonly List<SplitContainer> modelSplits = [];
         private readonly HashSet<string> profiles = [];
         private byte[] checkpoint = [];
         internal bool CheckpointUnchanged => File.ReadAllBytes(Path).SequenceEqual(checkpoint);
@@ -191,10 +192,13 @@ internal static class PaneCapacityScenario
             await Program.Contains(Terminal, "CMUX_TEST_READY>");
             await Program.Until(async () => await Browser.Core.ExecuteScriptAsync("document.querySelector('#page')?.textContent") == "\"/pane-capacity-target\"", "The owned pane-capacity browser did not load.");
             AddModels(Source, Terminal, 127); AddModels(Destination, Browser, InitialPanes - 129);
+            Window.CaptureSession().Validate();
             Window.SelectWorkspace(1); Window.SelectWorkspace(0); Terminal.FocusPane();
             Window.CaptureSession().Validate();
             Require(Count(Window) == InitialPanes && models.Count == InitialPanes - 2 && Processes.Count == 1,
                 "The private native pane graph has the wrong count or started engines.");
+            Require(modelSplits.All(split => (split.Orientation == Orientation.Vertical ? split.ClientSize.Width : split.ClientSize.Height) > split.SplitterWidth),
+                "The owned model tree has no usable split extent.");
         }
         private void AddModels(WorkspaceView workspace, WorkspacePane existing, int count)
         {
@@ -211,16 +215,18 @@ internal static class PaneCapacityScenario
                 workspace.Controls.Add(root);
             }
             finally { workspace.ResumeLayout(performLayout: true); }
-            Control Balanced(List<Control> nodes)
+            Control Balanced(List<Control> nodes, int depth = 0)
             {
                 if (nodes.Count == 1) return nodes[0];
                 var half = nodes.Count / 2;
-                return Wrapper(Balanced(nodes.GetRange(0, half)), Balanced(nodes.GetRange(half, nodes.Count - half)));
+                return Wrapper(Balanced(nodes.GetRange(0, half), depth + 1), Balanced(nodes.GetRange(half, nodes.Count - half), depth + 1),
+                    depth % 2 == 0 ? Orientation.Horizontal : Orientation.Vertical);
             }
-            SplitContainer Wrapper(Control first, Control second)
+            SplitContainer Wrapper(Control first, Control second, Orientation orientation = Orientation.Vertical)
             {
-                var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
+                var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = orientation, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
                 split.Panel1.Controls.Add(first); split.Panel2.Controls.Add(second); workspace.PendingRatios[split] = .5;
+                modelSplits.Add(split);
                 return split;
             }
         }
