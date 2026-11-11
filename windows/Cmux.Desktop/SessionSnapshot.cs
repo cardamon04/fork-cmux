@@ -5,6 +5,7 @@ internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int S
     internal const int CurrentVersion = 1;
     internal const int MaxWorkspaces = 64;
     internal const int MaxWorkspaceSequence = int.MaxValue - 1;
+    internal const int MaxPanes = 256;
     internal const int MaxLayoutDepth = 16;
     internal const int MaxBytes = 1024 * 1024;
 
@@ -34,7 +35,7 @@ internal sealed record SessionSnapshot(int Version, int WorkspaceSequence, int S
             return ValidateNode(node.First, depth + 1, ref total) + ValidateNode(node.Second, depth + 1, ref total);
         }
         if (node.First is not null || node.Second is not null || node.Ratio is not null || node.Orientation is not null
-            || ++total > 256) throw new InvalidDataException();
+            || ++total > MaxPanes) throw new InvalidDataException();
         if (node.Kind == "terminal")
         {
             if (node.Url is not null || !SessionStore.IsLocalPath(node.Directory)) throw new InvalidDataException();

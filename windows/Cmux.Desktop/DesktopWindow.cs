@@ -147,12 +147,13 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["MoveWorkspaceUp"]!.Enabled = sidebar.SelectedIndex > 0;
         toolbar.Items["MoveWorkspaceDown"]!.Enabled = sidebar.SelectedIndex >= 0 && sidebar.SelectedIndex < sidebar.Items.Count - 1;
         var canCreate = CanCreateWorkspace();
-        toolbar.Items["NewWorkspace"]!.Enabled = canCreate;
+        var canAdd = CanAddPane();
+        toolbar.Items["NewWorkspace"]!.Enabled = canCreate && canAdd;
         toolbar.Items["MovePaneToNewWorkspace"]!.Enabled = canCreate && Current is { Active: not null, Panes.Count: > 1 };
         paneDestinations.Enabled = Current is { Active: not null, Panes.Count: > 0 } && sidebar.Items.Count > 1;
-        var canSplit = Current is { Active: { } selected } current && CanSplitPane(current, selected);
+        var canSplit = canAdd && Current is { Active: { } selected } current && CanSplitPane(current, selected);
         toolbar.Items["SplitRight"]!.Enabled = toolbar.Items["SplitBelow"]!.Enabled = canSplit;
-        toolbar.Items["OpenBrowser"]!.Enabled = Current is null ? canCreate : canSplit;
+        toolbar.Items["OpenBrowser"]!.Enabled = Current is null ? canCreate && canAdd : canSplit;
         SetStatusText(directoryStatus, Current?.Active is TerminalPane terminal ? strings.Format("WorkingDirectory", terminal.WorkingDirectory) : "");
         UpdateGitTarget();
         UpdateCaption();
@@ -527,9 +528,11 @@ internal sealed class DesktopWindow : Form
     private bool CanCreateWorkspace() => sidebar.Items.Count < SessionSnapshot.MaxWorkspaces
         && workspaceSequence < SessionSnapshot.MaxWorkspaceSequence;
 
+    private bool CanAddPane() => Workspaces.Sum(workspace => workspace.Panes.Count) < SessionSnapshot.MaxPanes;
+
     private async Task NewWorkspace(PaneKind kind)
     {
-        if (!CanCreateWorkspace()) return;
+        if (!CanCreateWorkspace() || !CanAddPane()) return;
         var workspace = new WorkspaceView(strings.Format("Workspace", ++workspaceSequence)) { Dock = DockStyle.Fill };
         content.Controls.Add(workspace);
         sidebar.Items.Add(workspace);
@@ -627,7 +630,7 @@ internal sealed class DesktopWindow : Form
 
     private async Task Split(Orientation orientation, PaneKind kind)
     {
-        if (Current is not { Active: { } previous } workspace || !CanSplitPane(workspace, previous)) return;
+        if (Current is not { Active: { } previous } workspace || !CanSplitPane(workspace, previous) || !CanAddPane()) return;
         var parent = previous.Parent!;
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = orientation, SplitterWidth = 5, Panel1MinSize = 0, Panel2MinSize = 0 };
         var paneLaunch = previous is TerminalPane terminal && kind == PaneKind.Terminal
