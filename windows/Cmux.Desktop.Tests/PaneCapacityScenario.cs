@@ -296,7 +296,18 @@ internal static class PaneCapacityScenario
     {
         var token = Guid.NewGuid().ToString("N");
         await Program.Command(pane, "Write-Output ($global:cmuxPaneCapacity" + label + " + ':' + '" + token + "')");
-        await Program.Contains(pane, "CAPACITY_" + label + ":" + token);
+        var expected = "CAPACITY_" + label + ":" + token;
+        try { await Program.Contains(pane, expected); }
+        catch
+        {
+            try
+            {
+                var renderer = await pane.Core.ExecuteScriptAsync("(()=>{const b=term.buffer.active,lines=[];for(let i=Math.max(0,b.length-60);i<b.length;i++){const line=b.getLine(i);lines.push({index:i,isWrapped:line?.isWrapped,text:line?.translateToString(true)});}return {cols:term.cols,rows:term.rows,cursorX:b.cursorX,cursorY:b.cursorY,baseY:b.baseY,lines};})()").WaitAsync(TimeSpan.FromSeconds(5));
+                Console.WriteLine("PANE_CAPACITY_MEMORY_DIAGNOSTIC " + JsonSerializer.Serialize(new { label, expected, renderer = JsonSerializer.Deserialize<JsonElement>(renderer) }));
+            }
+            catch (Exception diagnostic) { Console.WriteLine("PANE_CAPACITY_MEMORY_DIAGNOSTIC_ERROR " + diagnostic.Message); }
+            throw;
+        }
     }
     private static async Task MoveToExisting(DesktopWindow window, WorkspaceView destination)
     {
