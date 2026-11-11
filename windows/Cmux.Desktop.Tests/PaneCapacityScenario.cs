@@ -297,7 +297,15 @@ internal static class PaneCapacityScenario
         var token = Guid.NewGuid().ToString("N");
         await Program.Command(pane, "Write-Output ($global:cmuxPaneCapacity" + label + " + ':' + '" + token + "')");
         var expected = "CAPACITY_" + label + ":" + token;
-        try { await Program.Contains(pane, expected); }
+        try
+        {
+            // Existing-target moves can leave only 23 columns. Join xterm soft
+            // wraps, preserving hard newlines and the full value + fresh nonce.
+            const string logicalText = "(()=>{const b=term.buffer.active;let text='';for(let i=0;i<b.length;i++){const line=b.getLine(i);if(i&&!line.isWrapped)text+='\\n';text+=line.translateToString(true);}return text;})()";
+            await Program.Until(async () => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync(logicalText))!.Contains(expected, StringComparison.Ordinal), "Missing logical rendered output: " + expected);
+            if (!(await Program.Text(pane)).Contains(expected, StringComparison.Ordinal))
+                Console.WriteLine("PANE_CAPACITY_SOFT_WRAP_MATCH " + JsonSerializer.Serialize(new { label, expected }));
+        }
         catch
         {
             try
