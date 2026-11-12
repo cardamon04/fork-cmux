@@ -31,7 +31,7 @@ internal static class LayoutExtentScenario
         var ratioErrors = new List<string>();
         void RatioFailure(object? _, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {
-            if (ratioErrors.Count < 8 && e.Exception is ArgumentOutOfRangeException
+            if (ratioErrors.Count < 8 && (e.Exception is ArgumentOutOfRangeException or InvalidOperationException)
                 && e.Exception.StackTrace?.Contains("ApplyRestoredRatios", StringComparison.Ordinal) == true)
                 ratioErrors.Add(e.Exception.GetType().Name + ": " + e.Exception.Message);
         }
