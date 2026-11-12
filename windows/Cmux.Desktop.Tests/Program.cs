@@ -324,6 +324,7 @@ internal static class Program
                     await BrowserScenario.Run(window, passed, args.Length > 1 ? args[1] : null);
                     BrowserLoadStateScenario.Run(passed);
                     await BrowserStopScenario.Run(window, passed, args.ElementAtOrDefault(1));
+                    await BrowserCancellationScenario.Run(window, passed);
                     await window.Shutdown().WaitAsync(Deadline);
                     Require(!Directory.Exists(profile), "Application profile was not removed.");
                     Require(window.BrowserProfilePath is { } privateBrowser && !Directory.Exists(privateBrowser), "Browser profile was not removed.");
@@ -474,6 +475,7 @@ internal static class Program
                 await BrowserScenario.Run(window, passed, args.Length > 0 ? args[0] : null);
                 BrowserLoadStateScenario.Run(passed);
                 await BrowserStopScenario.Run(window, passed, args.ElementAtOrDefault(0));
+                await BrowserCancellationScenario.Run(window, passed);
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
