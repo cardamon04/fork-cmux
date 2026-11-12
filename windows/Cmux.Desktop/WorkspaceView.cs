@@ -11,6 +11,8 @@ internal sealed class WorkspaceView(string title) : Panel
     }
     internal readonly List<WorkspacePane> Panes = [];
     internal readonly Dictionary<SplitContainer, double> PendingRatios = [];
+    private readonly HashSet<SplitContainer> waitingForExtent = [];
+    private bool applyingRatios;
     internal WorkspacePane? Active;
     internal long SelectionRevision;
     internal double SplitRatio(SplitContainer split)
@@ -21,20 +23,69 @@ internal sealed class WorkspaceView(string title) : Panel
     }
     internal void ApplyRestoredRatios()
     {
-        PerformLayout();
-        void Apply(Control control)
+        if (applyingRatios || IsDisposed) return;
+        applyingRatios = true;
+        try
         {
-            if (control is not SplitContainer split) return;
-            if (PendingRatios.Remove(split, out var ratio))
+            PerformLayout();
+            void Apply(Control control)
             {
-                var available = Math.Max(0, (split.Orientation == Orientation.Vertical ? split.ClientSize.Width : split.ClientSize.Height) - split.SplitterWidth);
-                split.SplitterDistance = Math.Clamp((int)Math.Round(available * ratio), 0, available);
-                split.PerformLayout();
+                // Resizing can also occur while a pane transaction reparents children.
+                if (control.IsDisposed || control is not SplitContainer split
+                    || split.Panel1.Controls.Count != 1 || split.Panel2.Controls.Count != 1) return;
+                if (PendingRatios.TryGetValue(split, out var ratio))
+                {
+                    var available = (split.Orientation == Orientation.Vertical ? split.ClientSize.Width : split.ClientSize.Height) - split.SplitterWidth;
+                    var maximum = available - split.Panel2MinSize;
+                    if (available <= 0 || maximum < split.Panel1MinSize) WaitForExtent(split);
+                    else
+                    {
+                        split.SplitterDistance = Math.Clamp((int)Math.Round(available * ratio), split.Panel1MinSize, maximum);
+                        PendingRatios.Remove(split);
+                        StopWaiting(split);
+                        split.PerformLayout();
+                    }
+                }
+                else StopWaiting(split);
+                Apply(split.Panel1.Controls[0]);
+                Apply(split.Panel2.Controls[0]);
             }
-            Apply(split.Panel1.Controls[0]);
-            Apply(split.Panel2.Controls[0]);
+            if (Controls.Count == 1) Apply(Controls[0]);
         }
-        if (Controls.Count != 0) Apply(Controls[0]);
+        finally { applyingRatios = false; }
+    }
+    private void WaitForExtent(SplitContainer split)
+    {
+        if (!waitingForExtent.Add(split)) return;
+        split.SizeChanged += ExtentChanged;
+        split.Disposed += SplitDisposed;
+    }
+    private void StopWaiting(SplitContainer split)
+    {
+        if (!waitingForExtent.Remove(split)) return;
+        split.SizeChanged -= ExtentChanged;
+        split.Disposed -= SplitDisposed;
+    }
+    private void ExtentChanged(object? sender, EventArgs e)
+    {
+        if (sender is not SplitContainer split) return;
+        if (!PendingRatios.ContainsKey(split)) { StopWaiting(split); return; }
+        if (Visible) ApplyRestoredRatios();
+    }
+    private void SplitDisposed(object? sender, EventArgs e)
+    {
+        if (sender is not SplitContainer split) return;
+        PendingRatios.Remove(split);
+        StopWaiting(split);
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            foreach (var split in waitingForExtent.ToArray()) StopWaiting(split);
+            PendingRatios.Clear();
+        }
+        base.Dispose(disposing);
     }
     public override string ToString() => Title;
 }
