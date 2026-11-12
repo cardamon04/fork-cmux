@@ -304,6 +304,7 @@ internal static class Program
                     SessionStoreScenario.Run(passed);
                     await SessionScenario.Run(shell, passed, args.Length > 1 ? args[1] : null);
                     await SessionRegressionScenario.Run(shell, passed);
+                    await LayoutExtentScenario.Run(shell, passed);
                     Require(uiErrors.Count == 0, "Session operations reached native UI dispatch with an exception.");
                     await window.Shutdown().WaitAsync(Deadline);
                     exitCode = 0;
@@ -477,6 +478,7 @@ internal static class Program
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
+                await LayoutExtentScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
