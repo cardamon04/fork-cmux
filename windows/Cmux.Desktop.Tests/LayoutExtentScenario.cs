@@ -28,6 +28,13 @@ internal static class LayoutExtentScenario
         using (var store = new SessionStore(path)) { store.Open(); store.Save(saved); }
         var checkpoint = File.ReadAllBytes(path);
         using var window = new DesktopWindow(launch, new MemoryClipboard(), new SessionStore(path)) { ShowInTaskbar = false };
+        var ratioErrors = new List<string>();
+        void RatioFailure(object? _, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            if (ratioErrors.Count < 8 && e.Exception is ArgumentOutOfRangeException
+                && e.Exception.StackTrace?.Contains("ApplyRestoredRatios", StringComparison.Ordinal) == true)
+                ratioErrors.Add(e.Exception.GetType().Name + ": " + e.Exception.Message);
+        }
         var phase = "restore-startup";
         try
         {
@@ -36,9 +43,20 @@ internal static class LayoutExtentScenario
                 orientation, side, validSavedGraph = true, leaves = 3, depth = 2,
                 outerRatio = root.Ratio, innerRatio = desired, activePane = 1, configuredBrowserPanes = 3,
             }));
-            window.Show();
-            await window.Started.WaitAsync(TimeSpan.FromSeconds(30));
+            AppDomain.CurrentDomain.FirstChanceException += RatioFailure;
+            try { window.Show(); await window.Started.WaitAsync(TimeSpan.FromSeconds(30)); }
+            finally { AppDomain.CurrentDomain.FirstChanceException -= RatioFailure; }
             var workspace = window.Current!;
+            Console.WriteLine("LAYOUT_EXTENT_STARTUP " + JsonSerializer.Serialize(new
+            {
+                orientation, side, window.SessionStatus, window.LastError,
+                workspaces = window.Workspaces.Count(), paneKinds = workspace.Panes.Select(pane => pane.Kind.ToString()).ToArray(),
+                rootControl = workspace.Controls.Count == 0 ? "empty" : workspace.Controls[0].GetType().Name,
+                canSave = window.IsActionEnabled("SaveSession"), ratioErrors,
+            }));
+            Require(ratioErrors.Count == 0 && window.SessionStatus == new Strings()["SessionRestored"]
+                && workspace.Panes.Count == 3 && workspace.Panes.All(pane => pane is BrowserPane),
+                "A valid saved collapsed graph was replaced during native restoration.");
             var outer = (SplitContainer)workspace.Controls[0];
             var nested = (SplitContainer)(side == "first" ? outer.Panel1 : outer.Panel2).Controls[0];
             var panes = workspace.Panes.OfType<BrowserPane>().ToArray();
@@ -90,7 +108,7 @@ internal static class LayoutExtentScenario
             Console.WriteLine("LAYOUT_EXTENT_FAILURE " + JsonSerializer.Serialize(new
             {
                 orientation, side, phase, error = error.Message, type = error.GetType().Name,
-                checkpointUnchanged = checkpoint.SequenceEqual(File.ReadAllBytes(path)),
+                checkpointUnchanged = checkpoint.SequenceEqual(File.ReadAllBytes(path)), ratioErrors,
             }));
             throw;
         }
