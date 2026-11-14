@@ -1,7 +1,5 @@
 'use strict';
 function createTerminalSearch(term) {
-  const search = new SearchAddon.SearchAddon({highlightLimit:1000});
-  term.loadAddon(search);
   const bar = document.getElementById('find-bar');
   const query = document.getElementById('find-query');
   const previous = document.getElementById('find-previous');
@@ -29,28 +27,41 @@ function createTerminalSearch(term) {
     else search.findNext(query.value, options);
   }
   function changed() {
+    if (bar.hidden) return;
     clear();
-    if (bar.hidden || composing) return;
+    if (composing) return;
     results.textContent = strings[query.value ? 'FindSearching' : 'FindEmpty'];
     if (query.value) pending = setTimeout(() => run(false, true), 150);
   }
-  search.onDidChangeResults(({resultIndex, resultCount}) => {
+  function updateResults({resultIndex, resultCount}) {
     if (bar.hidden || composing) return;
     next.disabled = previous.disabled = resultCount === 0;
     // The addon caps highlighted results at 1,000; never present that cap as an exact total.
     results.textContent = resultCount === 0 ? strings.FindMissing
       : resultCount >= 1000 ? '≥ ' + numbers.format(1000)
       : numbers.format(resultIndex + 1) + ' / ' + numbers.format(resultCount);
-  });
+  }
+  function createSearch() {
+    const addon = new SearchAddon.SearchAddon({highlightLimit:1000});
+    term.loadAddon(addon);
+    addon.onDidChangeResults(updateResults);
+    return addon;
+  }
+  let search = createSearch();
   bar.addEventListener('submit', event => event.preventDefault());
   query.addEventListener('input', changed);
-  query.addEventListener('compositionstart', () => { composing = true; clear(); });
+  query.addEventListener('compositionstart', () => { composing = true; if (!bar.hidden) clear(); });
   query.addEventListener('compositionend', () => { composing = false; changed(); });
   matchCase.addEventListener('change', changed);
   previous.addEventListener('click', () => run(true));
   next.addEventListener('click', () => run());
   function dismiss() {
-    clear(); bar.hidden = true; term.focus();
+    clear();
+    // clearDecorations alone leaves the addon's queued output/resize refresh alive.
+    // Dispose its timers and subscriptions before handing selection back to output.
+    search.dispose();
+    search = createSearch();
+    bar.hidden = true; term.focus();
   }
   function ownsFocus() { return !bar.hidden && bar.contains(document.activeElement); }
   close.addEventListener('click', dismiss);

@@ -18,7 +18,11 @@ F-02の選択・コピーを進める独立単位です。baseは未マージ#26
 & windows/Cmux.Desktop.Tests/bin/Debug/net10.0-windows/Cmux.Desktop.Tests.exe desktop-results
 ```
 
-2種のshellごとに実scrollback・Unicode出力、明示Copy、Find query、未送信Unicode入力とEnter後の実行、pane/workspace/browser分離、所有shell/profile解放を確認します。各6件と9localeの1件が新規13件です。private MemoryClipboardを使い、実OS clipboardは操作しません。診断後のテスト・操作・assertionは固定し、最終件数と従来345件保持は実行結果で判定します。ローカルはcompileのみでnative app/testを起動しません。physical input、標準overflowでの実マウス操作、OS IME、全geometry、4agent/10paneの1営業日受入は未実施です。
+2種のshellごとに実scrollback・Unicode出力、明示Copy、Find query、遅延検索refresh、非表示Findのイベント、未送信Unicode入力とEnter後の実行、pane/workspace/browser分離、所有shell/profile解放を確認します。各8件と9localeの1件が新規17件です。private MemoryClipboardを使い、実OS clipboardは操作しません。ローカルはcompileのみでnative app/testを起動しません。physical input、標準overflowでの実マウス操作、OS IME、全geometry、4agent/10paneの1営業日受入は未実施です。
+
+独立レビュー後に検出器を強め、[4c7c9716の隔離実行](https://github.com/cardamon04/fork-cmux/actions/runs/43539593800)で両shellのFind選択消失を3条件ずつ再現しました。閉じた後のrows変更、pinned addonが所有する200ms callback、非表示後のDOMイベントを別々に判別し、Copy前に毎回新しいclipboard sentinelを置きます。遅延callbackはCI所有renderer内で実addonのタイマーを制御して判別します。DOM compositionイベントは実OS IMEの検証ではありません。製品は閉じる際に公開dispose APIで検索addonのtimer/subscriptionを解放して作り直し、非表示入力イベントを無視します。全選択前にサイズを同期更新し、後続resizeによる選択消失を防ぎます。
+
+初期の入力検出は物理行を検索していたため、49列で折り返したnonceを見落としました。4c7c9716では両shellの出力がlogical readerで一致しphysical readerでは不一致でした。soft wrapだけを結合してhard newlineを保つ検出へ修正し、9件の非native正負対照で確認しています。これは製品の入力欠落を示す証拠ではありません。初回redと最終fixture全体のbyte一致は主張しません。4c7c9716の17件を製品修正後も固定し、最終件数と従来345件保持は実行結果で判定します。
 
 ## 本家mainの評価
 

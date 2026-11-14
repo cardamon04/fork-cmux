@@ -108,7 +108,8 @@ resize();
 send({kind:'ready', cols:term.cols, rows:term.rows});
 // Native renderer actions and read-only inspection for application integration.
 window.cmux = Object.freeze({
-  selectAllOutput: () => { find.dismiss(); term.selectAll(); },
+  // Closing Find grows the terminal. Fit first because a later row resize clears selection.
+  selectAllOutput: () => { find.dismiss(); resize(); term.selectAll(); },
   selection: () => term.getSelection(),
   copySelection: () => find.selection() ?? term.getSelection(),
   text: () => Array.from({length:term.buffer.active.length}, (_,i) => term.buffer.active.getLine(i).translateToString(true)).join('\n'),
