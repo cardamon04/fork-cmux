@@ -477,6 +477,7 @@ internal static class Program
                 SessionStoreScenario.Run(passed);
                 await SessionScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await SessionRegressionScenario.Run(shell, passed);
+                await TerminalSelectAllScenario.Run(shell, passed);
                 await WorkingDirectoryScenario.Run(shell, passed, args.Length > 0 ? args[0] : null);
                 await UnicodeInputScenario.Run(shell, passed, args.ElementAtOrDefault(0));
                 await TerminalTitleScenario.Run(shell, passed, args.ElementAtOrDefault(0));
