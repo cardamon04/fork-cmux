@@ -63,6 +63,7 @@ function createTerminalSearch(term) {
   });
   window.addEventListener('pagehide', clear);
   return Object.freeze({
+    dismiss,
     // Native toolbar focus temporarily leaves the WebView. Its DOM focus still
     // identifies the input owner; pasted search text must never become shell input.
     paste: text => {

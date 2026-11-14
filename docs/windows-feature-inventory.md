@@ -42,3 +42,9 @@ Draft群の到達点、既知不具合、仕様回答待ちと未検証の区別
 ## 2026-11-11の本家追加契約
 
 本家main `0718958d20e3321c223d3e9182c11d067fc8e5bd` までの差分で、left-sidebarのtoggle/show/hide/focus/modeとwindow/workspace対象指定（F-01/F-05）、設定されたClaude実行ファイルごとのmobile model discovery cache（F-09/F-13）、nested Claudeのsession/PID所有権とbounded hook確認（F-09/F-10）、Cloud Enterprise/operator member管理（F-12）を比較課題に追加しました。現在のWindows CLI/socket・agent/mobile/cloud統合は未実装で、容量修正によって対応済みとは扱いません。[変更範囲の評価](windows-pane-capacity.md)に記録します。
+
+## 2026-11-14の追加対照
+
+F-02の端末出力全選択を#29で追加し、FindとCopyの所有権・未送信入力・pane/workspace/browser分離を隔離Windowsで確認します。実行結果は同PRを参照し、物理入力・OS clipboard・実IMEまで合格とはしません。
+
+本家TUIのhook順序はboot_id/monotonic_nsで並べ、同値はjournal順、別bootは適用、stampなしはjournal順、状態stampはrestart後も保持する契約へ変わっています。遅延errorは順序に従い、lifecycle/dialogは適用します。WindowsはBELの一時状態のみでhook/journalは未実装のため、F-04/F-09/F-10の比較保留に追加します。CloudのChatGPT sign-inはclient IDがなければ無効で、F-12の将来比較対象です。認証・hook設定・CI規則を取り込みません。

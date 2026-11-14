@@ -1,6 +1,6 @@
 # Windows実装の到達点と残作業
 
-2026-11-11時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#26に対する整理です。各PRは未マージで、#26は#25に依存し、BLOCK中の#20を含みません。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-14時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#26・#29に対する整理です。各PRは未マージで、#29は#26に依存し、BLOCK中の#20/#28と閉鎖済み#27を含みません。#28の新16件はログ上通過しましたが、全体DETACH_STATE失敗の帰属・345件保持・実checkout treeは未確定です。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
@@ -27,7 +27,11 @@
 - **履歴仕様**：元インタビューのQ1〜Q15は回答済みですが、実装時の保存対象・期間の追加質問は未回答です。command/outputを追加保存しません。
 - **共通CI**：fast guards/Mac compileの上限とfork不足branch等は各最終HEADの実結果をPRに記録します。Windows lane成功とaggregate成功を混同せず、時間上限・設定・チェックを変更しません。
 
-## 今の独立単位を選ぶ理由
+## 端末出力の全選択
+
+#29はF-02の選択・コピーを日常利用できる単位として進めます。選択中の端末の保持出力を全選択し、その後の明示Copyで取得します。Find欄を閉じて検索文字列の所有権と混同せず、未送信入力と他pane/workspaceの選択を保ちます。browserでは無効です。保存仕様・認証・実PC操作やBLOCK修正に依存しません。[実行範囲と本家差分評価](windows-terminal-select-all.md)、[最終結果](https://github.com/cardamon04/fork-cmux/pull/29)を参照します。全selection/shortcut互換や実OS clipboard・IMEの合格とはしません。
+
+## 前回の独立単位を選んだ理由
 
 #26はF-01/F-10の保存整合性を守る修正です。全体256ペインの保存可能なnative graphから、workspace作成・通常分割で257ペインへ増えて保存検証に失敗する経路を両PowerShellで再現しました。通常workspace作成・terminal/browser分割が同じ追加上限を確認し、native actionも同じ判定を使います。既存ペインを新workspaceや既存workspaceへ移す操作は、ペイン数が増えないため維持します。closeで1個空けば再び追加でき、schema・履歴範囲・既存workspace数/採番/深度の制約は変えません。bytes上限は別課題です。少数の実エンジンと未起動モデルによるgraph検証で、256 live engineやGUI復元の受入とは区別します。[再現・検証範囲と本家42コミットの評価](windows-pane-capacity.md)を参照してください。
 
