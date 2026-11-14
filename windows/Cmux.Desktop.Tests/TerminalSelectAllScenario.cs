@@ -140,13 +140,19 @@ internal static class TerminalSelectAllScenario
             await Program.Until(async () => Compact(await Program.Text(first)).Contains(Compact(command)), "The owned shell did not display its unfinished input.");
             await window.ClickAction("SelectAllOutput");
             await window.ClickAction("Copy");
-            Require(!(await Program.Text(first)).Contains(output), "Select all submitted unfinished shell input.");
+            Require(!(await LogicalText(first)).Contains(output, StringComparison.Ordinal), "Select all submitted unfinished shell input.");
             foreach (var type in new[] { "keyDown", "keyUp" })
                 await first.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", JsonSerializer.Serialize(new
                 {
                     type, key = "Enter", code = "Enter", windowsVirtualKeyCode = 13, nativeVirtualKeyCode = 13, text = type == "keyDown" ? "\r" : "",
                 }));
-            await Program.Contains(first, output); await Prompt(first);
+            await Program.Until(async () => (await LogicalText(first)).Contains(output, StringComparison.Ordinal), "Missing logical select-all pending output: " + output);
+            await Prompt(first);
+            Console.WriteLine("SELECT_ALL_PENDING_OUTCOME " + JsonSerializer.Serialize(new
+            {
+                shell, matchedLogical = true, matchedPhysical = (await Program.Text(first)).Contains(output, StringComparison.Ordinal),
+                geometry = JsonSerializer.Deserialize<JsonElement>(await first.Core.ExecuteScriptAsync("({cols:term.cols,rows:term.rows})")),
+            }));
             Require(ReferenceEquals(first.Core, identity), "Select all restarted the selected renderer.");
             Pass(passed, "pending-unicode-input-preserved-" + shell);
 
@@ -205,6 +211,8 @@ internal static class TerminalSelectAllScenario
     }
     private static Task Prompt(TerminalPane pane) => Program.Until(async () => (await Program.Text(pane)).TrimEnd().EndsWith("CMUX_TEST_READY>", StringComparison.Ordinal), "The select-all shell did not finish its prompt.");
     private static async Task<string> Selection(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("window.cmux.selection()"))!;
+    // Join soft-wrap continuations only; a hard newline must remain a boundary.
+    private static async Task<string> LogicalText(TerminalPane pane) => JsonSerializer.Deserialize<string>(await pane.Core.ExecuteScriptAsync("(() => { const b=term.buffer.active; let text=''; for(let i=0;i<b.length;i++){ const line=b.getLine(i); if(i&&!line.isWrapped)text+='\\n'; text+=line.translateToString(true); } return text; })()"))!;
     private static Task Query(TerminalPane pane, string value) => pane.Core.ExecuteScriptAsync("(() => { const q=document.getElementById('find-query'); q.value=" + JsonSerializer.Serialize(value) + "; q.focus(); q.select(); q.dispatchEvent(new Event('input',{bubbles:true})); })()");
     private static string Compact(string value) => value.Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal);
     private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
