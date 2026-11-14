@@ -86,6 +86,7 @@ internal sealed class DesktopWindow : Form
         AddAction("SaveSession", SaveSession);
         toolbar.Items.Add(new ToolStripSeparator());
         AddAction("Copy", async () => { if (Current?.Active is { } pane) await pane.Copy(); });
+        AddAction("SelectAllOutput", async () => { if (Current?.Active is TerminalPane pane) await pane.SelectAllOutput(); });
         AddAction("Paste", () => { Current?.Active?.Paste(); return Task.CompletedTask; });
         AddAction("Find", () => { (Current?.Active as TerminalPane)?.Find(); return Task.CompletedTask; });
         AddAction("NextUnread", NextUnread);
@@ -138,6 +139,7 @@ internal sealed class DesktopWindow : Form
         var allowed = Current?.Active?.SupportsClipboard == true;
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
+        toolbar.Items["SelectAllOutput"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["NextUnread"]!.Enabled = Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().Any(pane => pane.HasUnread);
         foreach (var key in new[] { "IncreaseFontSize", "DecreaseFontSize", "ResetFontSize" })

@@ -106,8 +106,10 @@ window.chrome.webview.addEventListener('message', event => {
 new ResizeObserver(resize).observe(document.getElementById('terminal'));
 resize();
 send({kind:'ready', cols:term.cols, rows:term.rows});
-// Read-only renderer inspection also supports application-level integration tests.
+// Native renderer actions and read-only inspection for application integration.
 window.cmux = Object.freeze({
+  // Closing Find grows the terminal. Fit first because a later row resize clears selection.
+  selectAllOutput: () => { find.dismiss(); resize(); term.selectAll(); },
   selection: () => term.getSelection(),
   copySelection: () => find.selection() ?? term.getSelection(),
   text: () => Array.from({length:term.buffer.active.length}, (_,i) => term.buffer.active.getLine(i).translateToString(true)).join('\n'),
