@@ -75,7 +75,9 @@
     "MovePaneToWorkspace": "Move pane to workspace",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "The selected pane is too deeply nested. Choose another pane in this workspace.",
-    "SelectAllOutput": "Select all output"
+    "SelectAllOutput": "Select all output",
+    "FocusPreviousPane": "Previous pane",
+    "FocusNextPane": "Next pane"
   },
   "ja": {
     "AppTitle": "cmux Windows",
@@ -153,7 +155,9 @@
     "MovePaneToWorkspace": "既存ワークスペースへペインを移動",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "移動先のペインは分割が深いため、このワークスペースの別のペインを選んでください。",
-    "SelectAllOutput": "出力をすべて選択"
+    "SelectAllOutput": "出力をすべて選択",
+    "FocusPreviousPane": "前のペイン",
+    "FocusNextPane": "次のペイン"
   },
   "de": {
     "AppTitle": "cmux Windows",
@@ -231,7 +235,9 @@
     "MovePaneToWorkspace": "Bereich in Arbeitsbereich verschieben",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "Der ausgewählte Bereich ist zu tief verschachtelt. Wähle einen anderen Bereich in diesem Arbeitsbereich.",
-    "SelectAllOutput": "Gesamte Ausgabe auswählen"
+    "SelectAllOutput": "Gesamte Ausgabe auswählen",
+    "FocusPreviousPane": "Vorheriger Bereich",
+    "FocusNextPane": "Nächster Bereich"
   },
   "fr": {
     "AppTitle": "cmux Windows",
@@ -309,7 +315,9 @@
     "MovePaneToWorkspace": "Déplacer le panneau vers un espace de travail",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "Le panneau sélectionné est trop imbriqué. Choisissez un autre panneau dans cet espace de travail.",
-    "SelectAllOutput": "Sélectionner toute la sortie"
+    "SelectAllOutput": "Sélectionner toute la sortie",
+    "FocusPreviousPane": "Volet précédent",
+    "FocusNextPane": "Volet suivant"
   },
   "ar": {
     "AppTitle": "cmux Windows",
@@ -387,7 +395,9 @@
     "MovePaneToWorkspace": "نقل اللوحة إلى مساحة عمل",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "اللوحة المحددة متداخلة بعمق كبير. اختر لوحة أخرى في مساحة العمل هذه.",
-    "SelectAllOutput": "تحديد كل المخرجات"
+    "SelectAllOutput": "تحديد كل المخرجات",
+    "FocusPreviousPane": "الجزء السابق",
+    "FocusNextPane": "الجزء التالي"
   },
   "es": {
     "AppTitle": "cmux Windows",
@@ -465,7 +475,9 @@
     "MovePaneToWorkspace": "Mover panel a un espacio de trabajo",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "El panel seleccionado está demasiado anidado. Elige otro panel en este espacio de trabajo.",
-    "SelectAllOutput": "Seleccionar toda la salida"
+    "SelectAllOutput": "Seleccionar toda la salida",
+    "FocusPreviousPane": "Panel anterior",
+    "FocusNextPane": "Panel siguiente"
   },
   "zh-Hant": {
     "AppTitle": "cmux Windows",
@@ -543,7 +555,9 @@
     "MovePaneToWorkspace": "將窗格移至工作區",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "所選窗格的巢狀層級過深。請選擇此工作區中的其他窗格。",
-    "SelectAllOutput": "選取所有輸出"
+    "SelectAllOutput": "選取所有輸出",
+    "FocusPreviousPane": "上一個窗格",
+    "FocusNextPane": "下一個窗格"
   },
   "zh-Hans": {
     "AppTitle": "cmux Windows",
@@ -621,7 +635,9 @@
     "MovePaneToWorkspace": "将窗格移至工作区",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "所选窗格的嵌套层级过深。请选择此工作区中的其他窗格。",
-    "SelectAllOutput": "选择所有输出"
+    "SelectAllOutput": "选择所有输出",
+    "FocusPreviousPane": "上一个窗格",
+    "FocusNextPane": "下一个窗格"
   },
   "ko": {
     "AppTitle": "cmux Windows",
@@ -699,6 +715,8 @@
     "MovePaneToWorkspace": "다른 작업 공간으로 창 이동",
     "WorkspaceDestination": "{0}: {1}",
     "MovePaneDepthLimit": "선택한 창의 분할 단계가 너무 깊습니다. 이 작업 공간에서 다른 창을 선택하세요.",
-    "SelectAllOutput": "모든 출력 선택"
+    "SelectAllOutput": "모든 출력 선택",
+    "FocusPreviousPane": "이전 분할창",
+    "FocusNextPane": "다음 분할창"
   }
 }

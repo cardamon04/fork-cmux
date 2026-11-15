@@ -1,6 +1,6 @@
 # Windows実装の到達点と残作業
 
-2026-11-14時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#26・#29に対する整理です。各PRは未マージで、#29は#26に依存し、BLOCK中の#20/#28と閉鎖済み#27を含みません。#28の新16件はログ上通過しましたが、全体DETACH_STATE失敗の帰属・345件保持・実checkout treeは未確定です。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
+2026-11-14時点の[要件](requirements.md)とDraft PR #1〜#19・#21〜#26・#29・#30に対する整理です。各PRは未マージで、#30は#29、#29は#26に依存し、BLOCK中の#20/#28と閉鎖済み#27を含みません。#28の新16件はログ上通過しましたが、全体DETACH_STATE失敗の帰属・345件保持・実checkout treeは未確定です。mainで使える完成製品とは扱いません。[機能対照表](windows-feature-inventory.md)は調査中であり、本表も全機能の網羅・合格を示しません。最新コミットの実行結果とレビュー証拠は対応PRを確認します。
 
 | 要件 | 実装した独立部分 | 残る実装・検証 |
 | --- | --- | --- |
@@ -52,3 +52,7 @@ F-04で明記された通知一覧のうち、既存BELの未読端末を行か�
 未読は引き続きlive terminal paneの一時状態です。表示済み行はpaneを保持し、後着BELで対象を変えません。クリック時に生存状態・未読状態・現在のownerを確認し、既存の未読移動と同じ経路でfocus・既読化します。通知の永続保存、OS通知設定、新しいshortcutは追加しません。本家のmodifier/digitによる通知行操作は未実装として残します。
 
 本家`manaflow-ai/cmux:main`の日次差分確認を継続します。#21開始時の比較先は`c9ed9bd7078e439efc1e09e50cd5577af33ee516`です。初期baselineと未完項目を保持し、[差分評価と検証範囲](windows-notifications-list.md)を記録します。
+
+## 次／前のペインへの移動
+
+#30はF-01のフォーカス移動を、本家と同じlive split-tree順で循環させる単位です。生成順とは区別し、terminal/browserの既存FocusPaneと選択・表示更新を共有します。close/split/move後は現在のtreeから対象を解決し、他workspaceへは移動しません。新しいshortcut/API/保存fieldは追加せず、実PC GUI/IMEや#20/#28の保留に依存しません。[比較・検証範囲](windows-pane-focus.md)と[最終結果](https://github.com/cardamon04/fork-cmux/pull/30)を参照します。全フォーカス/タブ/キー互換の合格とはしません。
