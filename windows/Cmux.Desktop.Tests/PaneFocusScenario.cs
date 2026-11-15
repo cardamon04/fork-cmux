@@ -34,7 +34,8 @@ internal static class PaneFocusScenario
         var firstDirectory = Directory.CreateDirectory(Path.Combine(root, "first_日本語")).FullName;
         var clipboard = new MemoryClipboard { Text = "private pane focus sentinel" };
         await using var fixture = new BrowserFixture();
-        using var window = new DesktopWindow(source with { Directory = root }, clipboard, new SessionStore(path)) { ShowInTaskbar = false };
+        var launch = source with { Directory = root, Arguments = ShellLaunch.PowerShellArguments(source.Arguments[^1], noProfile: true) };
+        using var window = new DesktopWindow(launch, clipboard, new SessionStore(path)) { ShowInTaskbar = false };
         var processes = new Dictionary<TerminalPane, Process>();
         var profiles = new HashSet<string>();
         var phase = "setup";
