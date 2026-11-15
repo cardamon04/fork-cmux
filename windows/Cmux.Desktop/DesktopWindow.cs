@@ -76,6 +76,8 @@ internal sealed class DesktopWindow : Form
         AddAction("SplitRight", () => Split(Orientation.Vertical));
         AddAction("SplitBelow", () => Split(Orientation.Horizontal));
         AddAction("OpenBrowser", OpenBrowser);
+        AddAction("FocusPreviousPane", () => CyclePaneFocus(false));
+        AddAction("FocusNextPane", () => CyclePaneFocus(true));
         AddAction("MovePaneToNewWorkspace", MovePaneToNewWorkspace);
         paneDestinations.Text = paneDestinations.ToolTipText = strings["MovePaneToWorkspace"];
         paneDestinations.DropDown.ShowItemToolTips = true;
@@ -140,6 +142,8 @@ internal sealed class DesktopWindow : Form
         toolbar.Items["Copy"]!.Enabled = allowed;
         toolbar.Items["Paste"]!.Enabled = allowed;
         toolbar.Items["SelectAllOutput"]!.Enabled = Current?.Active is TerminalPane;
+        foreach (var key in new[] { "FocusPreviousPane", "FocusNextPane" })
+            toolbar.Items[key]!.Enabled = Current is { Active: not null, Panes.Count: > 1 };
         toolbar.Items["Find"]!.Enabled = Current?.Active is TerminalPane;
         toolbar.Items["NextUnread"]!.Enabled = Workspaces.SelectMany(workspace => workspace.Panes).OfType<TerminalPane>().Any(pane => pane.HasUnread);
         foreach (var key in new[] { "IncreaseFontSize", "DecreaseFontSize", "ResetFontSize" })
@@ -353,6 +357,32 @@ internal sealed class DesktopWindow : Form
         }
         catch (Exception error) { ShowError(error.Message); }
         finally { if (!shuttingDown && !closingWindow) toolbar.Enabled = true; }
+    }
+
+    private Task CyclePaneFocus(bool forward)
+    {
+        if (Current is not { Active: { } active } workspace || workspace.Controls.Count != 1) return Task.CompletedTask;
+        var owned = workspace.Panes.Where(pane => !pane.IsDisposed).ToHashSet();
+        var ordered = PaneTreeOrder(workspace.Controls[0]).Where(owned.Contains).ToArray();
+        var index = Array.IndexOf(ordered, active);
+        if (ordered.Length < 2 || index < 0) return Task.CompletedTask;
+        var target = ordered[(index + (forward ? 1 : ordered.Length - 1)) % ordered.Length];
+        target.FocusPane();
+        if (Current == workspace) ActivatePane(workspace, target);
+        return Task.CompletedTask;
+    }
+
+    private static IEnumerable<WorkspacePane> PaneTreeOrder(Control control)
+    {
+        if (control is WorkspacePane pane) yield return pane;
+        else if (control is SplitContainer split)
+        {
+            // Native split-tree order matches the saved visual layout; creation
+            // order diverges after splitting an earlier pane, closing or moving.
+            foreach (var panel in new[] { split.Panel1, split.Panel2 })
+                if (panel.Controls.Count == 1)
+                    foreach (var child in PaneTreeOrder(panel.Controls[0])) yield return child;
+        }
     }
 
     private Task RenameWorkspace()

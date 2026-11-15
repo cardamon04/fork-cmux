@@ -48,3 +48,7 @@ Draft群の到達点、既知不具合、仕様回答待ちと未検証の区別
 F-02の端末出力全選択を#29で追加し、FindとCopyの所有権・未送信入力・pane/workspace/browser分離を隔離Windowsで確認します。実行結果は同PRを参照し、物理入力・OS clipboard・実IMEまで合格とはしません。
 
 本家TUIのhook順序はboot_id/monotonic_nsで並べ、同値はjournal順、別bootは適用、stampなしはjournal順、状態stampはrestart後も保持する契約へ変わっています。遅延errorは順序に従い、lifecycle/dialogは適用します。WindowsはBELの一時状態のみでhook/journalは未実装のため、F-04/F-09/F-10の比較保留に追加します。CloudのChatGPT sign-inはclient IDがなければ無効で、F-12の将来比較対象です。認証・hook設定・CI規則を取り込みません。
+
+## 2026-11-15の独立部分
+
+F-01のnext/previous pane focusを#30で追加します。現在のsplit-tree順・端で循環・live member確認を本家のPaneCycleNavigator/cycleFocusと比較し、terminal/browserの既存選択とfocus経路を使用します。別タブを全ペイン横断する本家PR #1611の操作は追加せず、外部実装は採用していません。生成順と異なる混在tree、close/split/move、workspace分離、未送信入力と既存ActivePane保存を隔離CIで確認します。実PCのキー/IME/overflowや全機能受入は未検証です。
